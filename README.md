@@ -1,24 +1,28 @@
-# Basic Python Calculator — version 3
+# Basic Python Calculator — version 4
 
 [![Tests](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml)
 
 A small desktop calculator written in Python with [Tkinter](https://docs.python.org/3/library/tkinter.html).
 Type the first number, pick an operator, type the second number, press `=` — the answer appears in the main
-window and in a small popup. Made by Sasha.
+window and in a small popup. There are also two one-number buttons: `eˣ` (natural exponent) and `ln`
+(natural logarithm). Made by Sasha.
 
-**This is version 3**, the newest one: the `main` branch is this code, tagged `v3.0`, plus the tests and the
-workflow that keep it working.
+**This is version 4**, the newest one: the `main` branch is this code, tagged `v4.0`, plus the tests and the
+workflow that keep it working. The two new buttons are what [issue #1][issue] asked for.
 
-## The three versions
+[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/1
 
-This repository keeps the three versions of the calculator as three versions of **one file** — `Calculator.py`,
-each with its own `README.md` — instead of three files sitting side by side:
+## The four versions
+
+This repository keeps every version of the calculator as a version of **one file** — `Calculator.py`, each
+with its own `README.md` — instead of several files sitting side by side:
 
 | Tag | What it is | How to get it |
 |-----|------------|---------------|
 | `v1.0` | The original. Two digit pads, one per number, 26 near-identical click handlers, whole-number state, Tk's default look. | `git checkout v1.0`, or the [Releases](https://github.com/sensocc/Basic-Python-Calculator/releases) page |
 | `v2.0` | The tidy-up. Numbers kept as text, a handler per *kind* of button, black/`SpringGreen2` styling. | `git checkout v2.0` |
-| `v3.0` | **This version.** Single keypad, one handler per kind of button, friendly error messages, and a clear hint when the Tk libraries are missing. | `git checkout v3.0` |
+| `v3.0` | One keypad instead of two, guarded maths with messages instead of tracebacks, and a clear hint when the Tk libraries are missing. | `git checkout v3.0` |
+| `v4.0` | **This version.** Adds the `eˣ` and `ln` buttons from issue #1, with tests for both. | `git checkout v4.0` |
 
 Every tag is also a GitHub Release, so any version can be downloaded as a zip without using git.
 
@@ -72,9 +76,11 @@ This calculator needs Python's tkinter toolkit, and Tk is not installed.
   │ 1  │ 2  │ 3  │ -  │
   ├────┼────┼────┼────┤
   │ 0  │ √  │ ^  │ +  │
-  ├────┴────┴────┼────┤
-  │ Reset │  =   │About│
-  └───────┴──────┴────┘
+  ├────┴────┼────┴────┤
+  │   eˣ    │   ln    │   <- the two buttons from issue #1
+  ├────┬────┴────┬────┤
+  │Reset│   =    │About│
+  └─────┴────────┴─────┘
 ```
 
 1. Press the digits of the first number.
@@ -86,7 +92,11 @@ Pressing a second operator finishes the first calculation, so `2 + 3 + 4 =` give
 the step it just did: `5 + 4 = 9`).
 After `=`, typing a digit starts a fresh number, while pressing an operator keeps using the answer.
 
-### Operators
+`eˣ` and `ln` take **one** number, so they are used the other way round: type the number, then press the
+button. Pressing one while an answer is already on show works on that answer, and pressing one while a
+calculation is waiting finishes it — `2 + 3 ln` is `2 + ln(3)`.
+
+### Operators and functions
 
 | Button | Meaning | Example |
 |--------|---------|---------|
@@ -96,10 +106,14 @@ After `=`, typing a digit starts a fresh number, while pressing an operator keep
 | `/` | division | `12 / 5 =` → `2.4` |
 | `^` | power | `2 ^ 10 =` → `1024` |
 | `√` | the second number is the **order of the root**, kept from version 1 | `8 √ 3 =` → `2`, `9 √ 2 =` → `3` |
+| `eˣ` | natural exponent: e (about 2.71828) to the power of the number | `2` `eˣ` → `7.38905609893` |
+| `ln` | natural logarithm: the power you raise e to, to get the number | `10` `ln` → `2.30258509299` |
+
+`eˣ` and `ln` undo each other, so `5 eˣ ln` gives `5` back.
 
 ### Messages instead of crashes
 
-Version 3 answers bad input with a sentence in the status line rather than a red traceback in the terminal:
+Bad input gets a sentence in the status line rather than a red traceback in the terminal:
 
 | You pressed | It says |
 |-------------|---------|
@@ -107,12 +121,32 @@ Version 3 answers bad input with a sentence in the status line rather than a red
 | `3 - 5 =` then `√ 2 =` | I cannot take a root of a negative number. |
 | `8 √ 0 =` | A root cannot have the order zero. |
 | `9 ^ 9 =`, then `^ 9 =` twice | That power is too big to work out. |
+| `0 ln`, or `3 - 5 =` then `ln` | I can only take the logarithm of a number above zero. |
+| `999 eˣ` | That exponent is too big to work out. |
 | `=` before entering an operator | Type it like this:  12 + 5 = |
-| an operator before entering a number | Type a number first. |
+| an operator or function before entering a number | Type a number first. |
 
-`calculate()` also refuses a negative base with a fractional exponent and anything that comes out infinite or
-too large for a float; those are hard to reach by clicking, so they are covered by tests rather than by a
-button sequence.
+`calculate()` and `apply_function()` also refuse a negative base with a fractional exponent and anything that
+comes out infinite or too large for a float; those are hard to reach by clicking, so they are covered by
+tests rather than by a button sequence.
+
+## What changed in version 4
+
+* **The two buttons from issue #1.** `eˣ` (natural exponent) and `ln` (natural logarithm) sit next to each
+  other on their own row, above `Reset`.
+* **They take one number.** Type the number, press the button, and the answer is there: `2` `eˣ` shows
+  `7.38905609893`, `10` `ln` shows `2.30258509299`. Pressing one while an answer is on show works on that
+  answer, so `9 √ 2 =` then `ln` gives `1.09861228867`.
+* **They fit the flow.** If a calculation is waiting, the function is worked out first and the calculation is
+  finished with it: `2 + 3 ln` shows `2 + ln(3) = 3.09861228867`. Typing a digit afterwards starts a new
+  number, exactly as after `=`.
+* **Guarded like everything else.** `ln` of zero or of a negative number, and an exponent too big for Python
+  to work out, get a sentence in the status line instead of a traceback.
+* **In the code:** one new table (`FUNCTIONS`), one new maths function (`apply_function()`), one new button
+  handler (`press_function()`), and a small `refuse()` helper that the old calculation path and the new
+  function path share. `calculate()` itself is untouched.
+* **In the tests:** both functions are covered end to end, and `setUp` now resets the *calculator* as well as
+  the window — before this, one test could carry a half-finished calculation into the next one.
 
 ## What changed in version 3
 
@@ -129,7 +163,7 @@ button sequence.
   `0.1 + 0.2` shows as `0.3` instead of `0.30000000000000004`.
 * **One result popup.** Pressing `=` reuses the popup window instead of piling up a new one every time.
 * **Helpful startup.** A missing Tk install is explained instead of raising `ImportError`, and the module
-  can be imported without Tk, which keeps `calculate()` and `format_number()` testable.
+  can be imported without Tk, which keeps the maths testable.
 
 ## Tests
 
@@ -138,7 +172,7 @@ install:
 
 | File | What it checks | Needs |
 |------|----------------|-------|
-| `test_calculator.py` | the maths function, every operator, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
+| `test_calculator.py` | the maths, every operator, both one-number functions, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
 | `test_gui_smoke.py` | the same buttons on a **real** Tk window — real widgets, real clicks, no errors inside Tk — and then starts `Calculator.py` to see that its window stays open. | tkinter, the Tcl/Tk libraries and a display; it skips itself when one of those is missing |
 
 Run them:
@@ -159,6 +193,9 @@ Every push and pull request runs them in
 
 * No decimal point button (the original had none either) and no way to type a negative number directly —
   but `3 - 5` gives `-2` and you can carry on calculating from it.
+* `eˣ` and `ln` are used as *number, then button*. There is no `ln` `10` `=` order, and no `e` or `ln`
+  buttons for the second number of a calculation.
+* The result popup belongs to `=`; `eˣ` and `ln` answer in the big display and the status line.
 * Numbers are shown rounded to 12 significant digits, so very long results are shortened.
 * Very large or very small results are printed in scientific notation, e.g. `1e+20`.
 * No history, no keyboard shortcuts — only the buttons.

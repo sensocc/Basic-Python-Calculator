@@ -14,6 +14,7 @@ can be imported and driven without Tk.
 """
 
 import importlib.util
+import math
 import subprocess
 import sys
 import types
@@ -146,6 +147,9 @@ class KeypadTestCase(unittest.TestCase):
         Calculator.state.result_label = None
         self.root = Calculator.build_window()
         self.buttons = {widget.cget("text"): widget for widget in FakeButton.instances}
+        # A new window is not a new calculator: the state has to be cleaned out too,
+        # or one test carries a half-finished calculation into the next one.
+        self.press("Reset")
 
     def press(self, *labels):
         for label in labels:
@@ -164,9 +168,9 @@ class KeypadTestCase(unittest.TestCase):
 
 
 class TestLayout(KeypadTestCase):
-    def test_there_are_nineteen_buttons(self):
-        self.assertEqual(len(Calculator.KEYPAD), 19)
-        self.assertEqual(len(self.buttons), 19)
+    def test_there_are_twenty_one_buttons(self):
+        self.assertEqual(len(Calculator.KEYPAD), 21)
+        self.assertEqual(len(self.buttons), 21)
 
     def test_every_keypad_entry_has_a_button(self):
         for entry in Calculator.KEYPAD:
@@ -176,10 +180,11 @@ class TestLayout(KeypadTestCase):
         labels = [widget.cget("text") for widget in FakeButton.instances]
         self.assertEqual(len(labels), len(set(labels)))
 
-    def test_the_digits_are_in_the_conventional_places(self):
+    def test_the_buttons_are_in_the_conventional_places(self):
         for label, row, column in (("7", 2, 0), ("8", 2, 1), ("9", 2, 2), ("/", 2, 3),
                                    ("1", 4, 0), ("0", 5, 0), ("+", 5, 3),
-                                   ("Reset", 6, 0), ("=", 6, 1), ("About", 6, 3)):
+                                   ("eˣ", 6, 0), ("ln", 6, 2),
+                                   ("Reset", 7, 0), ("=", 7, 1), ("About", 7, 3)):
             options = self.buttons[label].grid_options
             self.assertEqual((options["row"], options["column"]), (row, column),
                              "button " + label)
@@ -188,7 +193,7 @@ class TestLayout(KeypadTestCase):
         columns = sorted({widget.grid_options["column"] for widget in FakeButton.instances})
         rows = sorted({widget.grid_options["row"] for widget in FakeButton.instances})
         self.assertEqual(columns, [0, 1, 2, 3])
-        self.assertEqual(rows, [2, 3, 4, 5, 6])
+        self.assertEqual(rows, [2, 3, 4, 5, 6, 7])
 
     def test_equals_spans_two_columns(self):
         self.assertEqual(self.buttons["="].grid_options["columnspan"], 2)
@@ -201,7 +206,7 @@ class TestLayout(KeypadTestCase):
         self.assertLess(status["row"], display["row"])
 
     def test_the_window_has_a_title(self):
-        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V3")
+        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V4")
 
 
 class TestTheMaths(unittest.TestCase):
@@ -245,6 +250,39 @@ class TestTheMaths(unittest.TestCase):
         ):
             with self.subTest(value=value):
                 self.assertEqual(Calculator.format_number(value), expected)
+
+    def test_the_natural_exponent(self):
+        for value, expected in ((0, 1.0), (1, math.e), (2, math.e ** 2), (-1, 1 / math.e)):
+            with self.subTest(value=value):
+                self.assertAlmostEqual(Calculator.apply_function("exp", value), expected)
+
+    def test_the_natural_logarithm(self):
+        for value, expected in ((1, 0.0), (math.e, 1.0), (10, math.log(10)), (0.5, -math.log(2))):
+            with self.subTest(value=value):
+                self.assertAlmostEqual(Calculator.apply_function("ln", value), expected)
+
+    def test_the_exponent_and_the_logarithm_undo_each_other(self):
+        for value in (0.5, 2, 99):
+            with self.subTest(value=value):
+                self.assertAlmostEqual(
+                    Calculator.apply_function("ln", Calculator.apply_function("exp", value)), value)
+
+    def test_impossible_functions_are_refused(self):
+        for function, value, complaint in (
+            ("ln", 0, "logarithm of a number above zero"),
+            ("ln", -1, "logarithm of a number above zero"),
+            ("exp", 1000, "exponent is too big"),
+            ("exp", float("nan"), "not a number I can show"),
+            ("sin", 1, "I do not know the function"),
+        ):
+            with self.subTest(function=function, value=value):
+                with self.assertRaises(ValueError) as caught:
+                    Calculator.apply_function(function, value)
+                self.assertIn(complaint, str(caught.exception))
+
+    def test_how_a_function_reads_on_the_status_line(self):
+        self.assertEqual(Calculator.write_function("exp", "2"), "e^2")
+        self.assertEqual(Calculator.write_function("ln", "2"), "ln(2)")
 
     def test_a_number_too_big_to_show_is_refused(self):
         with self.assertRaises(ValueError):
@@ -318,8 +356,53 @@ class TestButtons(KeypadTestCase):
         self.assertEqual(about.title_text, "About This App")
         labels = [widget.cget("text") for widget in FakeLabel.instances
                   if widget.master is about]
-        self.assertEqual(labels, ["VER 3.0! Made by Sasha!",
-                                 "Cleaned up and modernised from version 2."])
+        self.assertEqual(labels, ["VER 4.0! Made by Sasha!",
+                                 "Version 4: eˣ and ln, from issue #1."])
+
+
+class TestTheFunctionButtons(KeypadTestCase):
+    def test_the_natural_exponent_button(self):
+        self.press("1", "eˣ")
+        self.assertEqual(self.display(), "2.71828182846")
+        self.assertEqual(self.status(), "e^1 = 2.71828182846")
+
+    def test_the_natural_logarithm_button(self):
+        self.press("1", "0", "ln")
+        self.assertEqual(self.display(), "2.30258509299")
+        self.assertEqual(self.status(), "ln(10) = 2.30258509299")
+
+    def test_a_function_works_on_the_answer_on_show(self):
+        self.press("9", "√", "2", "=")                  # 9 √ 2 = 3
+        self.assertEqual(self.display(), "3")
+        self.press("ln")
+        self.assertEqual(self.status(), "ln(3) = 1.09861228867")
+
+    def test_a_function_finishes_a_waiting_calculation(self):
+        self.press("2", "+", "3", "ln")
+        self.assertEqual(self.display(), "3.09861228867")
+        self.assertEqual(self.status(), "2 + ln(3) = 3.09861228867")
+
+    def test_the_answer_carries_on(self):
+        self.press("2", "eˣ", "+", "1", "=")
+        self.assertEqual(self.display(), "8.38905609893")
+
+    def test_a_digit_after_a_function_starts_a_new_number(self):
+        self.press("2", "eˣ", "7", "+", "1", "=")
+        self.assertEqual(self.display(), "8")
+
+    def test_the_two_functions_undo_each_other(self):
+        self.press("5", "eˣ")
+        self.assertNotEqual(self.display(), "5")
+        self.press("ln")
+        self.assertEqual(self.display(), "5")
+
+    def test_a_function_before_a_number(self):
+        self.press("eˣ")
+        self.assertEqual(self.status(), "Type a number first.")
+
+    def test_a_function_after_an_operator_with_no_number(self):
+        self.press("2", "+", "ln")
+        self.assertEqual(self.status(), "Type a number first.")
 
 
 class TestBadInput(KeypadTestCase):
@@ -356,6 +439,23 @@ class TestBadInput(KeypadTestCase):
 
     def test_an_operator_before_a_number(self):
         self.assertEqual(self.complain("+"), "Type a number first.")
+
+    def test_the_logarithm_of_zero(self):
+        self.assertEqual(self.complain("0", "ln"),
+                         "I can only take the logarithm of a number above zero.")
+
+    def test_the_logarithm_of_a_negative_number(self):
+        self.assertEqual(self.complain("3", "-", "5", "=", "ln"),
+                         "I can only take the logarithm of a number above zero.")
+
+    def test_an_exponent_that_is_too_big(self):
+        self.assertEqual(self.complain("9", "9", "9", "eˣ"),
+                         "That exponent is too big to work out.")
+
+    def test_a_refused_function_clears_the_calculation(self):
+        self.press("0", "ln")
+        self.assertIsNone(Calculator.state.first)
+        self.assertEqual(Calculator.state.entry, "")
 
     def test_a_complaint_clears_the_half_finished_calculation(self):
         self.complain("5", "/", "0", "=")
