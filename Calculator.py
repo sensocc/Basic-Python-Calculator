@@ -1,11 +1,14 @@
-"""A small Tkinter calculator - version 3.
+"""A small Tkinter calculator - version 4.
 
-Cleaned up from version 2:
+Version 4 adds the two one-number buttons asked for in issue #1:
 
-* one keypad instead of two duplicated digit pads
-* one handler per kind of button instead of a function per button
-* readable messages instead of Python tracebacks when the maths goes wrong
-* a clear hint instead of an ImportError when the Tk libraries are missing
+* `eˣ` - the natural exponent: e (about 2.71828) to the power of the number
+* `ln` - the natural logarithm: the power you raise e to, to get the number
+
+They work on one number at a time, the way the rest of the keypad does: type
+the number, press the button, and the answer appears straight away. Pressing
+`ln` on a number that is already on show also works, so you can feed an answer
+into the next step.
 
 Run it with:
 
@@ -29,13 +32,17 @@ SMALL_FONT = ("Arial", 12)
 
 OPERATORS = ("/", "*", "-", "+", "√", "^")
 
+# label -> the one-number function it applies
+FUNCTIONS = {"eˣ": "exp", "ln": "ln"}
+
 # label, grid row, grid column, columnspan
 KEYPAD = (
     ("7", 2, 0, 1), ("8", 2, 1, 1), ("9", 2, 2, 1), ("/", 2, 3, 1),
     ("4", 3, 0, 1), ("5", 3, 1, 1), ("6", 3, 2, 1), ("*", 3, 3, 1),
     ("1", 4, 0, 1), ("2", 4, 1, 1), ("3", 4, 2, 1), ("-", 4, 3, 1),
     ("0", 5, 0, 1), ("√", 5, 1, 1), ("^", 5, 2, 1), ("+", 5, 3, 1),
-    ("Reset", 6, 0, 1), ("=", 6, 1, 2), ("About", 6, 3, 1),
+    ("ln", 6, 0, 2), ("eˣ", 6, 2, 2),
+    ("Reset", 7, 0, 1), ("=", 7, 1, 2), ("About", 7, 3, 1),
 )
 
 # The whole calculator state lives here, so no function needs a `global` line.
@@ -115,6 +122,36 @@ def calculate(left, operator, right):
     return result
 
 
+def apply_function(function, value):
+    """Apply a one-number function. Raises ValueError with a readable message.
+
+    `exp` is the natural exponent, e to the power of the number; `ln` is the
+    natural logarithm, the power you raise e to, to get the number.
+    """
+    if function == "exp":
+        try:
+            result = math.exp(value)
+        except OverflowError:
+            raise ValueError("That exponent is too big to work out.") from None
+    elif function == "ln":
+        if value <= 0:
+            raise ValueError("I can only take the logarithm of a number above zero.")
+        result = math.log(value)
+    else:
+        raise ValueError(f"I do not know the function {function!r}.")
+
+    if not math.isfinite(result):
+        raise ValueError("That result is not a number I can show.")
+    return result
+
+
+def write_function(function, text):
+    """How a one-number function reads on the status line."""
+    if function == "exp":
+        return "e^" + text
+    return "ln(" + text + ")"
+
+
 # --- drawing -----------------------------------------------------------------
 
 def update_display():
@@ -158,17 +195,22 @@ def press_digit(digit):
     update_display()
 
 
+def refuse(message):
+    """Give up on a half-finished calculation and say why."""
+    state.first = None
+    state.operator = None
+    state.entry = ""
+    state.status = ""
+    state.error = message
+
+
 def finish_calculation():
     """Work out  first <operator> entry.  Returns True when it worked."""
     try:
         value = calculate(state.first, state.operator, to_number(state.entry))
         text = format_number(value)
     except ValueError as error:
-        state.first = None
-        state.operator = None
-        state.entry = ""
-        state.status = ""
-        state.error = str(error)
+        refuse(str(error))
         return False
 
     state.first = value
@@ -196,6 +238,57 @@ def press_operator(operator):
 
     state.operator = operator
     state.status = f"{format_number(state.first)} {operator}"
+    update_display()
+
+
+def press_function(function):
+    """Apply a one-number function to the number on show.
+
+    The number being typed is used if there is one, otherwise the answer that is
+    already on show. A waiting calculation is finished with the answer, the same
+    way pressing an operator finishes it.
+    """
+    state.error = None
+
+    if state.entry:
+        value = to_number(state.entry)
+        written = write_function(function, state.entry)
+    elif state.operator is None and state.first is not None:
+        value = state.first
+        written = write_function(function, format_number(state.first))
+    else:
+        state.error = "Type a number first."
+        update_display()
+        return
+
+    try:
+        answer = apply_function(function, value)
+    except ValueError as error:
+        refuse(str(error))
+        update_display()
+        return
+
+    if state.operator is None:
+        state.first = answer
+        state.entry = ""
+        state.status = f"{written} = {format_number(answer)}"
+        update_display()
+        return
+
+    # Something like  2 + 3  is waiting: finish it with the answer as its last number.
+    left = format_number(state.first)
+    operator = state.operator
+    try:
+        combined = calculate(state.first, operator, answer)
+    except ValueError as error:
+        refuse(str(error))
+        update_display()
+        return
+
+    state.first = combined
+    state.operator = None
+    state.entry = ""
+    state.status = f"{left} {operator} {written} = {format_number(combined)}"
     update_display()
 
 
@@ -254,7 +347,7 @@ def open_about_window():
     window.configure(bg=BACKGROUND)
     tk.Label(
         window,
-        text="VER 3.0! Made by Sasha!",
+        text="VER 4.0! Made by Sasha!",
         padx=20,
         pady=20,
         font=FONT,
@@ -263,7 +356,7 @@ def open_about_window():
     ).pack()
     tk.Label(
         window,
-        text="Cleaned up and modernised from version 2.",
+        text="Version 4: eˣ and ln, from issue #1.",
         padx=20,
         font=SMALL_FONT,
         bg=BACKGROUND,
@@ -276,7 +369,7 @@ def open_about_window():
 def build_window():
     """Create the calculator window and remember its widgets on state."""
     root = tk.Tk()
-    root.title("My Fancy-Shmancy Calculator V3")
+    root.title("My Fancy-Shmancy Calculator V4")
     root.configure(bg=BACKGROUND)
     state.root = root
 
@@ -293,6 +386,8 @@ def build_window():
     for label, row, column, columnspan in KEYPAD:
         if label in OPERATORS:
             command = lambda op=label: press_operator(op)
+        elif label in FUNCTIONS:
+            command = lambda name=FUNCTIONS[label]: press_function(name)
         elif label == "=":
             command = press_equals
         elif label == "Reset":
@@ -305,9 +400,9 @@ def build_window():
 
     for column in range(4):
         root.columnconfigure(column, weight=1)
-    for row in range(2, 7):
+    for row in range(2, 8):
         root.rowconfigure(row, weight=1)
-    root.minsize(360, 430)
+    root.minsize(360, 490)
     return root
 
 
