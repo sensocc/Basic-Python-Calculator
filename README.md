@@ -77,7 +77,7 @@ This calculator needs Python's tkinter toolkit, and Tk is not installed.
   ├────┼────┼────┼────┤
   │ 0  │ √  │ ^  │ +  │
   ├────┴────┼────┴────┤
-  │   eˣ    │   ln    │   <- the two buttons from issue #1
+  │   ln    │   eˣ    │   <- the two buttons from issue #1
   ├────┬────┴────┬────┤
   │Reset│   =    │About│
   └─────┴────────┴─────┘
@@ -106,8 +106,8 @@ calculation is waiting finishes it — `2 + 3 ln` is `2 + ln(3)`.
 | `/` | division | `12 / 5 =` → `2.4` |
 | `^` | power | `2 ^ 10 =` → `1024` |
 | `√` | the second number is the **order of the root**, kept from version 1 | `8 √ 3 =` → `2`, `9 √ 2 =` → `3` |
-| `eˣ` | natural exponent: e (about 2.71828) to the power of the number | `2` `eˣ` → `7.38905609893` |
 | `ln` | natural logarithm: the power you raise e to, to get the number | `10` `ln` → `2.30258509299` |
+| `eˣ` | natural exponent: e (about 2.71828) to the power of the number | `2` `eˣ` → `7.38905609893` |
 
 `eˣ` and `ln` undo each other, so `5 eˣ ln` gives `5` back.
 

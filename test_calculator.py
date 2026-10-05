@@ -183,7 +183,7 @@ class TestLayout(KeypadTestCase):
     def test_the_buttons_are_in_the_conventional_places(self):
         for label, row, column in (("7", 2, 0), ("8", 2, 1), ("9", 2, 2), ("/", 2, 3),
                                    ("1", 4, 0), ("0", 5, 0), ("+", 5, 3),
-                                   ("eˣ", 6, 0), ("ln", 6, 2),
+                                   ("ln", 6, 0), ("eˣ", 6, 2),
                                    ("Reset", 7, 0), ("=", 7, 1), ("About", 7, 3)):
             options = self.buttons[label].grid_options
             self.assertEqual((options["row"], options["column"]), (row, column),
