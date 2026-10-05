@@ -1,10 +1,13 @@
 # Basic Python Calculator — version 3
 
+[![Tests](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml)
+
 A small desktop calculator written in Python with [Tkinter](https://docs.python.org/3/library/tkinter.html).
 Type the first number, pick an operator, type the second number, press `=` — the answer appears in the main
 window and in a small popup. Made by Sasha.
 
-**This is version 3**, the newest one: the `main` branch is this code, tagged `v3.0`.
+**This is version 3**, the newest one: the `main` branch is this code, tagged `v3.0`, plus the tests and the
+workflow that keep it working.
 
 ## The three versions
 
@@ -127,6 +130,30 @@ button sequence.
 * **One result popup.** Pressing `=` reuses the popup window instead of piling up a new one every time.
 * **Helpful startup.** A missing Tk install is explained instead of raising `ImportError`, and the module
   can be imported without Tk, which keeps `calculate()` and `format_number()` testable.
+
+## Tests
+
+Two test files, both plain [`unittest`](https://docs.python.org/3/library/unittest.html) — no packages to
+install:
+
+| File | What it checks | Needs |
+|------|----------------|-------|
+| `test_calculator.py` | the maths function, every operator, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
+| `test_gui_smoke.py` | the same buttons on a **real** Tk window — real widgets, real clicks, no errors inside Tk — and then starts `Calculator.py` to see that its window stays open. | tkinter, the Tcl/Tk libraries and a display; it skips itself when one of those is missing |
+
+Run them:
+
+```bash
+python3 -m unittest discover -v
+```
+
+Every push and pull request runs them in
+[GitHub Actions](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml):
+
+* **Tests — Python 3.9 / 3.13**: the whole suite on two Python versions with no display, so the window tests
+  skip themselves.
+* **Tests — with a real window**: the same suite under `xvfb-run`, which hands Tk a real display, so
+  `test_gui_smoke.py` runs for real.
 
 ## Known limits
 
