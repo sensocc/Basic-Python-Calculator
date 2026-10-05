@@ -1,15 +1,31 @@
-# Basic Python Calculator — version 2
+# Basic Python Calculator — version 3
 
-The same calculator as version 1, tidied up and dressed in black and green. Made by Sasha.
+A small desktop calculator written in Python with [Tkinter](https://docs.python.org/3/library/tkinter.html).
+Type the first number, pick an operator, type the second number, press `=` — the answer appears in the main
+window and in a small popup. Made by Sasha.
 
-**This is version 2.** Versions 1 and 3 are in this repository's
-[Releases](https://github.com/sensocc/Basic-Python-Calculator/releases) as the tags `v1.0` and `v3.0`.
+**This is version 3**, the newest one: the `main` branch is this code, tagged `v3.0`.
+
+## The three versions
+
+This repository keeps the three versions of the calculator as three versions of **one file** — `Calculator.py`,
+each with its own `README.md` — instead of three files sitting side by side:
+
+| Tag | What it is | How to get it |
+|-----|------------|---------------|
+| `v1.0` | The original. Two digit pads, one per number, 26 near-identical click handlers, whole-number state, Tk's default look. | `git checkout v1.0`, or the [Releases](https://github.com/sensocc/Basic-Python-Calculator/releases) page |
+| `v2.0` | The tidy-up. Numbers kept as text, a handler per *kind* of button, black/`SpringGreen2` styling. | `git checkout v2.0` |
+| `v3.0` | **This version.** Single keypad, one handler per kind of button, friendly error messages, and a clear hint when the Tk libraries are missing. | `git checkout v3.0` |
+
+Every tag is also a GitHub Release, so any version can be downloaded as a zip without using git.
 
 ## Requirements
 
-* Python 3
+* Python 3 (developed against Python 3.14)
 * Tkinter **and** the Tcl/Tk libraries it loads. Python often ships `tkinter` without them, and then the
   program stops with `ImportError: libtk8.6.so: cannot open shared object file`.
+
+Install Tk first:
 
 | System | Command |
 |--------|---------|
@@ -18,70 +34,104 @@ The same calculator as version 1, tidied up and dressed in black and green. Made
 | Fedora | `sudo dnf install python3-tkinter` |
 | macOS / Windows | Reinstall Python from [python.org](https://www.python.org/downloads/) — Tk is included |
 
+Check it worked:
+
+```bash
+python3 -c "import tkinter; print('Tk', tkinter.TkVersion)"
+```
+
 ## Running it
 
 ```bash
 python3 Calculator.py
 ```
 
+If Tk is missing you get a short explanation and the install command instead of a traceback:
+
+```
+$ python3 Calculator.py
+This calculator needs Python's tkinter toolkit, and Tk is not installed.
+...
+  Omarchy / Arch    omarchy pkg add tk
+```
+
 ## How to use it
 
 ```
-        the display line, e.g.   Your current first number: 12 | Your current second number: 5 | Your short result: 17
-  ┌─────────────┐   ┌─────────────┐
-  │ 1  2  3     │   │ 1  2  3     │
-  │ 4  5  6     │   │ 4  5  6     │
-  │ 7  8  9     │   │ 7  8  9     │
-  │    0        │   │    0        │
-  └─────────────┘   └─────────────┘
-     left pad           right pad
-  ┌────┬────┬────┬────┬────┬────┐
-  │ +  │ -  │ /  │ *  │ ^  │ √  │   and  About   Reset   =
-  └────┴────┴────┴────┴────┴────┘
+                      12 +
+                     ______
+                          5     <- the big number is what you are typing
+  ┌────┬────┬────┬────┐
+  │ 7  │ 8  │ 9  │ /  │
+  ├────┼────┼────┼────┤
+  │ 4  │ 5  │ 6  │ *  │
+  ├────┼────┼────┼────┤
+  │ 1  │ 2  │ 3  │ -  │
+  ├────┼────┼────┼────┤
+  │ 0  │ √  │ ^  │ +  │
+  ├────┴────┴────┼────┤
+  │ Reset │  =   │About│
+  └───────┴──────┴────┘
 ```
 
-1. The **left pad** types the first number, the **right pad** types the second one. There are only the
-   digits 0-9, so there is no decimal point and no minus sign.
-2. An **operator** button calculates immediately and puts the answer in the "short result" part of the
-   display line.
-3. `=` opens a small window with the result, `About` opens a credits window, `Reset` sets both numbers and
-   the result back to 0.
+1. Press the digits of the first number.
+2. Press an operator — the small line above shows what is waiting, e.g. `12 +`.
+3. Press the digits of the second number.
+4. Press `=` to see the answer. `Reset` starts a new calculation, `About` says hello.
+
+Pressing a second operator finishes the first calculation, so `2 + 3 + 4 =` gives `9` (the small line names
+the step it just did: `5 + 4 = 9`).
+After `=`, typing a digit starts a fresh number, while pressing an operator keeps using the answer.
 
 ### Operators
 
 | Button | Meaning | Example |
 |--------|---------|---------|
-| `+` | addition | `12` `+` `5` → 17.0 |
-| `-` | subtraction | `12` `-` `5` → 7.0 |
-| `*` | multiplication | `12` `*` `5` → 60.0 |
-| `/` | division | `12` `/` `5` → 2.4 |
-| `^` | power | `2` `^` `10` → 1024.0 |
-| `√` | the second number is the **order of the root** | `8` `√` `3` → 2, `9` `√` `2` → 3 |
+| `+` | addition | `12 + 5 =` → `17` |
+| `-` | subtraction | `12 - 5 =` → `7` |
+| `*` | multiplication | `12 * 5 =` → `60` |
+| `/` | division | `12 / 5 =` → `2.4` |
+| `^` | power | `2 ^ 10 =` → `1024` |
+| `√` | the second number is the **order of the root**, kept from version 1 | `8 √ 3 =` → `2`, `9 √ 2 =` → `3` |
 
-### Quirks worth knowing
+### Messages instead of crashes
 
-* Still two pads and still no decimal point button.
-* The numbers are text now, so a leading `0` is kept: pressing `0` then `1` shows `01` and calculates
-  with `1`.
-* Because every calculation goes through `float()`, whole answers are printed with a `.0`: `12 + 5` shows
-  `17.0`.
-* Results are printed exactly as Python prints them, so `10 / 3` shows `3.3333333333333335`.
-* Wrong input is a traceback in the terminal, not a message in the window:
-  * pressing an operator or `=` before typing a number raises `ValueError: could not convert string to float: ''`
-  * dividing by zero raises `ZeroDivisionError`, and so does a `√` with a second number of `0`
-  * a large power such as `999 ^ 999` raises `OverflowError: (34, 'Numerical result out of range')`
+Version 3 answers bad input with a sentence in the status line rather than a red traceback in the terminal:
 
-  The window keeps working after the traceback, but it is not a nice way to be told you cannot divide by
-  zero. Version 3 fixed all of this.
+| You pressed | It says |
+|-------------|---------|
+| `5 / 0 =` | You cannot divide by zero. |
+| `3 - 5 =` then `√ 2 =` | I cannot take a root of a negative number. |
+| `8 √ 0 =` | A root cannot have the order zero. |
+| `9 ^ 9 =`, then `^ 9 =` twice | That power is too big to work out. |
+| `=` before entering an operator | Type it like this:  12 + 5 = |
+| an operator before entering a number | Type a number first. |
 
-### What changed from version 1
+`calculate()` also refuses a negative base with a fractional exponent and anything that comes out infinite or
+too large for a float; those are hard to reach by clicking, so they are covered by tests rather than by a
+button sequence.
 
-* The numbers are kept as **text** (`num_one = ''`) instead of whole numbers, so a digit is just appended
-  to the string.
-* One function per **kind** of button instead of one per button: `num_1_update(digit)`,
-  `num_2_update(digit)` and `op_button_click(operator)`, wired to the buttons with `lambda`. That turned 26
-  handlers into 3 and made room for the next batch of buttons.
-* All the maths moved into `op_button_click`, where both numbers are turned into `float`s first — that is
-  where the `.0` on whole answers comes from.
-* The look: a black window with `SpringGreen2` text in Arial 18 (`bg='black'`, `fg='SpringGreen2'`) for the
-  main window, the About window and the result window. About now says `VER 2.0! Made by Sasha!`.
+## What changed in version 3
+
+* **One keypad.** Version 2 had two identical sets of digit buttons (one for each operand). Now there is a
+  single conventional grid and the program tracks which number you are typing.
+* **A handler per kind of button, not per button.** Version 1 had 26 hand-written click handlers; version 2
+  merged the digits into `num_1_update` / `num_2_update`; version 3 uses `press_digit(digit)` and
+  `press_operator(operator)`, driven by the `KEYPAD` table in `build_window()`.
+* **No `global` lines.** The state lives in one `SimpleNamespace` called `state`, and the handlers reach the
+  labels through it.
+* **Guarded maths.** `calculate()` raises `ValueError` with a readable message for division by zero, an
+  impossible root, a negative base with a fractional exponent, infinity and overflow.
+* **Tidier numbers.** Results are formatted with `.12g`, so `1 / 3` shows as `0.333333333333` and
+  `0.1 + 0.2` shows as `0.3` instead of `0.30000000000000004`.
+* **One result popup.** Pressing `=` reuses the popup window instead of piling up a new one every time.
+* **Helpful startup.** A missing Tk install is explained instead of raising `ImportError`, and the module
+  can be imported without Tk, which keeps `calculate()` and `format_number()` testable.
+
+## Known limits
+
+* No decimal point button (the original had none either) and no way to type a negative number directly —
+  but `3 - 5` gives `-2` and you can carry on calculating from it.
+* Numbers are shown rounded to 12 significant digits, so very long results are shortened.
+* Very large or very small results are printed in scientific notation, e.g. `1e+20`.
+* No history, no keyboard shortcuts — only the buttons.
