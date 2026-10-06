@@ -1,12 +1,12 @@
-"""A small Tkinter calculator - version 6.
+"""A small Tkinter calculator - version 7.
 
-Version 6 adds the two one-number buttons asked for in issue #4:
+Version 7 adds the trigonometry asked for in issue #5:
 
-* `log` - the common logarithm, base 10: `100 log` is `2`, `0.1 log` is `-1`
-* `%` - percent, which is the number divided by 100: `50 %` is `0.5`
+* `sin`, `cos`, `tg` and `ctg` - type an angle, press the button
+* a `DEG` / `RAD` switch, because an angle means nothing without its unit
 
-They are used the way `eˣ` and `ln` are - type the number, press the button -
-and they work on an answer that is on show as well.
+Degrees are the default, so `sin 30` is `0.5`. The switch changes its own label,
+and the answer says which unit made it: `sin(30°) = 0.5`, `sin(0.5 rad) = 0.479425538604`.
 
 Run it with:
 
@@ -30,8 +30,24 @@ SMALL_FONT = ("Arial", 12)
 
 OPERATORS = ("/", "*", "-", "+", "√", "^")
 
+# the one-number functions that take an angle
+ANGLES = ("sin", "cos", "tg", "ctg")
+
 # label -> the one-number function it applies
-FUNCTIONS = {"eˣ": "exp", "ln": "ln", "log": "log10", "%": "percent"}
+FUNCTIONS = {
+    "eˣ": "exp",
+    "ln": "ln",
+    "log": "log10",
+    "%": "percent",
+    "sin": "sin",
+    "cos": "cos",
+    "tg": "tg",
+    "ctg": "ctg",
+}
+
+# Anything this close to zero counts as zero: Python's cos 90° is 6.1e-17, and
+# its tan 90° is 1.6e16, which is not an answer at all.
+SMALL = 1e-12
 
 # label, grid row, grid column, columnspan
 KEYPAD = (
@@ -40,8 +56,9 @@ KEYPAD = (
     ("1", 4, 0, 1), ("2", 4, 1, 1), ("3", 4, 2, 1), ("-", 4, 3, 1),
     ("0", 5, 0, 1), (".", 5, 1, 1), ("±", 5, 2, 1), ("+", 5, 3, 1),
     ("√", 6, 0, 1), ("^", 6, 1, 1), ("ln", 6, 2, 1), ("eˣ", 6, 3, 1),
-    ("log", 7, 0, 2), ("%", 7, 2, 2),
-    ("Reset", 8, 0, 1), ("=", 8, 1, 2), ("About", 8, 3, 1),
+    ("log", 7, 0, 1), ("%", 7, 1, 1), ("sin", 7, 2, 1), ("cos", 7, 3, 1),
+    ("tg", 8, 0, 1), ("ctg", 8, 1, 1), ("DEG", 8, 2, 2),
+    ("Reset", 9, 0, 1), ("=", 9, 1, 2), ("About", 9, 3, 1),
 )
 
 # The whole calculator state lives here, so no function needs a `global` line.
@@ -49,6 +66,7 @@ state = SimpleNamespace(
     root=None,
     display_label=None,
     status_label=None,
+    angle_button=None,   # the DEG/RAD switch, so its label can change
     result_window=None,
     result_label=None,
     first=None,          # the number to the left of the operator
@@ -56,6 +74,7 @@ state = SimpleNamespace(
     entry="",            # the digits being typed right now
     status="",           # the small line above the big number
     error=None,          # a message to show instead of the status line
+    angle_mode="deg",    # what sin, cos, tg and ctg measure angles in
 )
 
 
@@ -133,12 +152,42 @@ def logarithm(function, value):
     return math.log10(value)
 
 
-def apply_function(function, value):
+def trigonometry(function, value, angle_mode):
+    """sin, cos, tg and ctg, with the unit switch and its two traps.
+
+    The traps are that tan 90° is not a number at all - turning 90 into radians
+    and asking Python gives 1.6e16 - and that cos 90° comes back as 6.1e-17
+    rather than 0, which would make the button look broken.
+    """
+    angle = math.radians(value) if angle_mode == "deg" else value
+
+    if function == "sin":
+        result = math.sin(angle)
+    elif function == "cos":
+        result = math.cos(angle)
+    elif function == "tg":
+        if abs(math.cos(angle)) < SMALL:
+            raise ValueError("I cannot take the tangent of that angle.")
+        result = math.tan(angle)
+    else:
+        if abs(math.sin(angle)) < SMALL:
+            raise ValueError("I cannot take the cotangent of that angle.")
+        result = math.cos(angle) / math.sin(angle)
+
+    if abs(result) < SMALL:
+        result = 0.0        # what is left of cos 90° is zero for practical purposes
+    return result
+
+
+def apply_function(function, value, angle_mode="deg"):
     """Apply a one-number function. Raises ValueError with a readable message.
 
     `exp` is the natural exponent, e to the power of the number; `ln` is the
     natural logarithm, the power you raise e to; `log10` is the common
     logarithm, base 10; and `percent` is simply the number divided by 100.
+
+    `sin`, `cos`, `tg` and `ctg` take their number as an angle measured in
+    `angle_mode`, which is `deg` unless the switch has been pressed.
     """
     if function == "exp":
         try:
@@ -149,6 +198,8 @@ def apply_function(function, value):
         result = logarithm(function, value)
     elif function == "percent":
         result = value / 100
+    elif function in ANGLES:
+        result = trigonometry(function, value, angle_mode)
     else:
         raise ValueError(f"I do not know the function {function!r}.")
 
@@ -157,7 +208,7 @@ def apply_function(function, value):
     return result
 
 
-def write_function(function, text):
+def write_function(function, text, angle_mode="deg"):
     """How a one-number function reads on the status line."""
     if function == "exp":
         return "e^" + text
@@ -165,6 +216,10 @@ def write_function(function, text):
         return text + "%"
     if function == "log10":
         return "log(" + text + ")"
+    if function in ANGLES:
+        # the unit is part of the answer, so say which one made it
+        unit = "°" if angle_mode == "deg" else " rad"
+        return function + "(" + text + unit + ")"
     if function == "ln":
         return "ln(" + text + ")"
     raise ValueError(f"I do not know how to write the function {function!r}.")
@@ -198,6 +253,7 @@ def add_button(text, command, row, column, columnspan):
         command=command,
     )
     button.grid(row=row, column=column, columnspan=columnspan, sticky="nsew", padx=3, pady=3)
+    return button
 
 
 # --- what the buttons do -----------------------------------------------------
@@ -325,13 +381,13 @@ def press_function(function):
         return
 
     try:
-        answer = apply_function(function, value)
+        answer = apply_function(function, value, state.angle_mode)
     except ValueError as error:
         refuse(str(error))
         update_display()
         return
 
-    written = write_function(function, shown)
+    written = write_function(function, shown, state.angle_mode)
 
     if state.operator is None:
         state.first = answer
@@ -354,6 +410,18 @@ def press_function(function):
     state.operator = None
     state.entry = ""
     state.status = f"{left} {operator} {written} = {format_number(combined)}"
+    update_display()
+
+
+def press_angle_mode():
+    """Switch sin, cos, tg and ctg between degrees and radians.
+
+    The switch is a setting, not part of the sum, so Reset leaves it alone.
+    """
+    state.error = None
+    state.angle_mode = "rad" if state.angle_mode == "deg" else "deg"
+    state.angle_button.config(text=state.angle_mode.upper())
+    state.status = "Angles in " + ("degrees" if state.angle_mode == "deg" else "radians")
     update_display()
 
 
@@ -412,7 +480,7 @@ def open_about_window():
     window.configure(bg=BACKGROUND)
     tk.Label(
         window,
-        text="VER 6.0! Made by Sasha!",
+        text="VER 7.0! Made by Sasha!",
         padx=20,
         pady=20,
         font=FONT,
@@ -421,7 +489,7 @@ def open_about_window():
     ).pack()
     tk.Label(
         window,
-        text="Version 6: log and percent, from issue #4.",
+        text="Version 7: sin, cos, tg and ctg, with a DEG/RAD switch.",
         padx=20,
         font=SMALL_FONT,
         bg=BACKGROUND,
@@ -434,7 +502,7 @@ def open_about_window():
 def build_window():
     """Create the calculator window and remember its widgets on state."""
     root = tk.Tk()
-    root.title("My Fancy-Shmancy Calculator V6")
+    root.title("My Fancy-Shmancy Calculator V7")
     root.configure(bg=BACKGROUND)
     state.root = root
 
@@ -459,19 +527,23 @@ def build_window():
             command = press_decimal_point
         elif label == "±":
             command = press_sign
+        elif label == "DEG":
+            command = press_angle_mode
         elif label == "Reset":
             command = press_reset
         elif label == "About":
             command = open_about_window
         else:
             command = lambda digit=label: press_digit(digit)
-        add_button(label, command, row, column, columnspan)
+        button = add_button(label, command, row, column, columnspan)
+        if label == "DEG":
+            state.angle_button = button       # its label follows the switch
 
     for column in range(4):
         root.columnconfigure(column, weight=1)
-    for row in range(2, 9):
+    for row in range(2, 10):
         root.rowconfigure(row, weight=1)
-    root.minsize(360, 550)
+    root.minsize(360, 610)
     return root
 
 
