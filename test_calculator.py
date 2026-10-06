@@ -150,6 +150,9 @@ class KeypadTestCase(unittest.TestCase):
         # A new window is not a new calculator: the state has to be cleaned out too,
         # or one test carries a half-finished calculation into the next one.
         self.press("Reset")
+        # The switch is a setting, so Reset deliberately leaves it alone - here it has
+        # to be put back by hand, or one test's degrees leak into the next test.
+        Calculator.state.angle_mode = "deg"
 
     def press(self, *labels):
         for label in labels:
@@ -168,9 +171,9 @@ class KeypadTestCase(unittest.TestCase):
 
 
 class TestLayout(KeypadTestCase):
-    def test_there_are_twenty_five_buttons(self):
-        self.assertEqual(len(Calculator.KEYPAD), 25)
-        self.assertEqual(len(self.buttons), 25)
+    def test_there_are_thirty_buttons(self):
+        self.assertEqual(len(Calculator.KEYPAD), 30)
+        self.assertEqual(len(self.buttons), 30)
 
     def test_every_keypad_entry_has_a_button(self):
         for entry in Calculator.KEYPAD:
@@ -185,8 +188,9 @@ class TestLayout(KeypadTestCase):
                                    ("1", 4, 0),
                                    ("0", 5, 0), (".", 5, 1), ("±", 5, 2), ("+", 5, 3),
                                    ("√", 6, 0), ("ln", 6, 2), ("eˣ", 6, 3),
-                                   ("log", 7, 0), ("%", 7, 2),
-                                   ("Reset", 8, 0), ("=", 8, 1), ("About", 8, 3)):
+                                   ("log", 7, 0), ("sin", 7, 2), ("cos", 7, 3),
+                                   ("tg", 8, 0), ("ctg", 8, 1), ("DEG", 8, 2),
+                                   ("Reset", 9, 0), ("=", 9, 1), ("About", 9, 3)):
             options = self.buttons[label].grid_options
             self.assertEqual((options["row"], options["column"]), (row, column),
                              "button " + label)
@@ -195,10 +199,13 @@ class TestLayout(KeypadTestCase):
         columns = sorted({widget.grid_options["column"] for widget in FakeButton.instances})
         rows = sorted({widget.grid_options["row"] for widget in FakeButton.instances})
         self.assertEqual(columns, [0, 1, 2, 3])
-        self.assertEqual(rows, [2, 3, 4, 5, 6, 7, 8])
+        self.assertEqual(rows, [2, 3, 4, 5, 6, 7, 8, 9])
 
     def test_equals_spans_two_columns(self):
         self.assertEqual(self.buttons["="].grid_options["columnspan"], 2)
+
+    def test_the_angle_switch_spans_two_columns(self):
+        self.assertEqual(self.buttons["DEG"].grid_options["columnspan"], 2)
 
     def test_the_status_line_sits_above_the_number(self):
         status = Calculator.state.status_label.grid_options
@@ -208,7 +215,7 @@ class TestLayout(KeypadTestCase):
         self.assertLess(status["row"], display["row"])
 
     def test_the_window_has_a_title(self):
-        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V6")
+        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V7")
 
 
 class TestTheMaths(unittest.TestCase):
@@ -275,6 +282,42 @@ class TestTheMaths(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertAlmostEqual(Calculator.apply_function("percent", value), expected)
 
+    def test_the_trigonometry_in_degrees(self):
+        for function, value, expected in (("sin", 30, 0.5), ("sin", 90, 1.0), ("sin", 0, 0.0),
+                                          ("cos", 60, 0.5), ("cos", 0, 1.0),
+                                          ("tg", 45, 1.0), ("tg", 0, 0.0),
+                                          ("ctg", 45, 1.0), ("ctg", 45.0, 1.0)):
+            with self.subTest(function=function, value=value):
+                self.assertAlmostEqual(Calculator.apply_function(function, value), expected)
+
+    def test_the_trigonometry_in_radians(self):
+        for function, value, expected in (("sin", 0.5, math.sin(0.5)), ("cos", 0, 1.0),
+                                          ("tg", 1, math.tan(1)),
+                                          ("ctg", 1, math.cos(1) / math.sin(1))):
+            with self.subTest(function=function, value=value):
+                self.assertAlmostEqual(
+                    Calculator.apply_function(function, value, "rad"), expected)
+
+    def test_the_two_units_disagree(self):
+        self.assertAlmostEqual(Calculator.apply_function("sin", 30, "deg"), 0.5)
+        self.assertAlmostEqual(Calculator.apply_function("sin", 30, "rad"), math.sin(30))
+
+    def test_answers_that_should_be_zero_are_shown_as_zero(self):
+        # Python gives 6.1e-17 for cos 90° and -1.2e-16 for tan 180°
+        for function, value in (("cos", 90), ("sin", 180), ("tg", 180), ("ctg", 90)):
+            with self.subTest(function=function, value=value):
+                self.assertEqual(Calculator.apply_function(function, value, "deg"), 0.0)
+
+    def test_impossible_trigonometry_is_refused(self):
+        for function, value, complaint in (("tg", 90, "tangent"),
+                                           ("tg", 270, "tangent"),
+                                           ("ctg", 0, "cotangent"),
+                                           ("ctg", 180, "cotangent")):
+            with self.subTest(function=function, value=value):
+                with self.assertRaises(ValueError) as caught:
+                    Calculator.apply_function(function, value, "deg")
+                self.assertIn("cannot take the " + complaint, str(caught.exception))
+
     def test_the_exponent_and_the_logarithm_undo_each_other(self):
         for value in (0.5, 2, 99):
             with self.subTest(value=value):
@@ -289,7 +332,7 @@ class TestTheMaths(unittest.TestCase):
             ("log10", -1, "logarithm of a number above zero"),
             ("exp", 1000, "exponent is too big"),
             ("exp", float("nan"), "not a number I can show"),
-            ("sin", 1, "I do not know the function"),
+            ("sqrt", 1, "I do not know the function"),
         ):
             with self.subTest(function=function, value=value):
                 with self.assertRaises(ValueError) as caught:
@@ -301,6 +344,8 @@ class TestTheMaths(unittest.TestCase):
         self.assertEqual(Calculator.write_function("ln", "2"), "ln(2)")
         self.assertEqual(Calculator.write_function("log10", "100"), "log(100)")
         self.assertEqual(Calculator.write_function("percent", "50"), "50%")
+        self.assertEqual(Calculator.write_function("sin", "30"), "sin(30°)")
+        self.assertEqual(Calculator.write_function("sin", "0.5", "rad"), "sin(0.5 rad)")
 
     def test_a_number_too_big_to_show_is_refused(self):
         with self.assertRaises(ValueError):
@@ -377,8 +422,8 @@ class TestButtons(KeypadTestCase):
         self.assertEqual(about.title_text, "About This App")
         labels = [widget.cget("text") for widget in FakeLabel.instances
                   if widget.master is about]
-        self.assertEqual(labels, ["VER 6.0! Made by Sasha!",
-                                 "Version 6: log and percent, from issue #4."])
+        self.assertEqual(labels, ["VER 7.0! Made by Sasha!",
+                                 "Version 7: sin, cos, tg and ctg, with a DEG/RAD switch."])
 
 
 class TestTypingDecimalsAndSigns(KeypadTestCase):
@@ -455,6 +500,72 @@ class TestTypingDecimalsAndSigns(KeypadTestCase):
     def test_the_sign_button_after_an_operator_with_no_number(self):
         self.press("2", "+", "±")
         self.assertEqual(self.status(), "Type a number first.")
+
+
+class TestTheAngleButtons(KeypadTestCase):
+    """sin, cos, tg, ctg and the DEG/RAD switch, from issue #5."""
+
+    def test_sine_in_degrees(self):
+        self.press("3", "0", "sin")
+        self.assertEqual(self.display(), "0.5")
+        self.assertEqual(self.status(), "sin(30°) = 0.5")
+
+    def test_the_other_three_in_degrees(self):
+        for label, keys, expected in (("cos", ("6", "0"), "0.5"),
+                                      ("tg", ("4", "5"), "1"),
+                                      ("ctg", ("4", "5"), "1")):
+            with self.subTest(button=label):
+                self.fresh()
+                self.press(*keys, label)
+                self.assertEqual(self.display(), expected)
+
+    def test_a_right_angle_cosine_is_zero(self):
+        self.press("9", "0", "cos")
+        self.assertEqual(self.display(), "0")
+
+    def test_the_switch_changes_the_answer(self):
+        self.press("3", "0", "sin")
+        self.assertEqual(self.display(), "0.5")
+        self.press("DEG")                       # the same button flips back and forth
+        self.assertEqual(self.display(), "0.5")
+        self.assertEqual(self.status(), "Angles in radians")
+        self.press("3", "0", "sin")
+        self.assertEqual(self.display(), "-0.988031624093")
+        self.assertEqual(self.status(), "sin(30 rad) = -0.988031624093")
+
+    def test_the_switch_renames_itself(self):
+        self.assertEqual(self.buttons["DEG"].cget("text"), "DEG")
+        self.press("DEG")
+        self.assertEqual(self.buttons["DEG"].cget("text"), "RAD")
+        self.assertEqual(self.status(), "Angles in radians")
+        self.press("DEG")
+        self.assertEqual(self.buttons["DEG"].cget("text"), "DEG")
+        self.assertEqual(self.status(), "Angles in degrees")
+
+    def test_the_switch_keeps_the_number_being_typed(self):
+        self.press("3", "0", "DEG")
+        self.assertEqual(self.display(), "30")
+        self.press("sin")
+        self.assertEqual(self.display(), "-0.988031624093")
+
+    def test_reset_leaves_the_switch_alone(self):
+        self.press("DEG")
+        self.fresh()
+        self.assertEqual(self.buttons["DEG"].cget("text"), "RAD")
+        self.press("3", "0", "sin")
+        self.assertEqual(self.display(), "-0.988031624093")
+
+    def test_the_angle_buttons_still_finish_a_calculation(self):
+        self.press("2", "+", "3", "0", "sin")
+        self.assertEqual(self.display(), "2.5")
+        self.assertEqual(self.status(), "2 + sin(30°) = 2.5")
+
+    def test_the_issue_5_example(self):
+        self.press("3", "0", "sin")
+        self.assertEqual(self.display(), "0.5")
+        self.press("DEG")
+        self.press("3", "0", "sin")
+        self.assertEqual(self.display(), "-0.988031624093")
 
 
 class TestTheFunctionButtons(KeypadTestCase):
@@ -595,6 +706,14 @@ class TestBadInput(KeypadTestCase):
     def test_a_negative_number_can_be_given_an_exponent(self):
         self.press("1", "±", "eˣ")
         self.assertEqual(self.display(), "0.367879441171")
+
+    def test_the_tangent_of_a_right_angle(self):
+        self.assertEqual(self.complain("9", "0", "tg"),
+                         "I cannot take the tangent of that angle.")
+
+    def test_the_cotangent_of_zero(self):
+        self.assertEqual(self.complain("0", "ctg"),
+                         "I cannot take the cotangent of that angle.")
 
     def test_a_refused_function_clears_the_calculation(self):
         self.press("0", "ln")
