@@ -1,18 +1,18 @@
-# Basic Python Calculator — version 4
+# Basic Python Calculator — version 5
 
 [![Tests](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml)
 
 A small desktop calculator written in Python with [Tkinter](https://docs.python.org/3/library/tkinter.html).
 Type the first number, pick an operator, type the second number, press `=` — the answer appears in the main
-window and in a small popup. There are also two one-number buttons: `eˣ` (natural exponent) and `ln`
-(natural logarithm). Made by Sasha.
+window and in a small popup. The numbers can be decimals, and the `±` button makes them negative. There are
+also one-number buttons for the natural exponent (`eˣ`) and the natural logarithm (`ln`). Made by Sasha.
 
-**This is version 4**, the newest one: the `main` branch is this code, tagged `v4.0`, plus the tests and the
-workflow that keep it working. The two new buttons are what [issue #1][issue] asked for.
+**This is version 5**, the newest one, tagged `v5.0`: the `.` and `±` buttons that
+[issue #3][issue] asked for, on top of the tests and the workflow that keep the calculator working.
 
-[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/1
+[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/3
 
-## The four versions
+## The five versions
 
 This repository keeps every version of the calculator as a version of **one file** — `Calculator.py`, each
 with its own `README.md` — instead of several files sitting side by side:
@@ -22,13 +22,14 @@ with its own `README.md` — instead of several files sitting side by side:
 | `v1.0` | The original. Two digit pads, one per number, 26 near-identical click handlers, whole-number state, Tk's default look. | `git checkout v1.0`, or the [Releases](https://github.com/sensocc/Basic-Python-Calculator/releases) page |
 | `v2.0` | The tidy-up. Numbers kept as text, a handler per *kind* of button, black/`SpringGreen2` styling. | `git checkout v2.0` |
 | `v3.0` | One keypad instead of two, guarded maths with messages instead of tracebacks, and a clear hint when the Tk libraries are missing. | `git checkout v3.0` |
-| `v4.0` | **This version.** Adds the `eˣ` and `ln` buttons from issue #1, with tests for both. | `git checkout v4.0` |
+| `v4.0` | Adds `eˣ` and `ln`, the two one-number buttons from issue #1. | `git checkout v4.0` |
+| `v5.0` | **This version.** Type decimals and negatives: a `.` and a `±` beside the digits. | `git checkout v5.0` |
 
 Every tag is also a GitHub Release, so any version can be downloaded as a zip without using git.
 
 ## Requirements
 
-* Python 3 (developed against Python 3.14)
+* Python 3 (developed against Python 3.14, tested on 3.9 as well)
 * Tkinter **and** the Tcl/Tk libraries it loads. Python often ships `tkinter` without them, and then the
   program stops with `ImportError: libtk8.6.so: cannot open shared object file`.
 
@@ -75,39 +76,44 @@ This calculator needs Python's tkinter toolkit, and Tk is not installed.
   ├────┼────┼────┼────┤
   │ 1  │ 2  │ 3  │ -  │
   ├────┼────┼────┼────┤
-  │ 0  │ √  │ ^  │ +  │
-  ├────┴────┼────┴────┤
-  │   ln    │   eˣ    │   <- the two buttons from issue #1
-  ├────┬────┴────┬────┤
+  │ 0  │ .  │ ±  │ +  │
+  ├────┼────┼────┼────┤
+  │ √  │ ^  │ ln │ eˣ │
+  ├────┼────┴────┼────┤
   │Reset│   =    │About│
   └─────┴────────┴─────┘
 ```
 
-1. Press the digits of the first number.
+1. Press the digits of the first number. Decimals and negatives are typed the same way: `.` starts `0.` and
+   `±` flips the sign, so `12` `.` `5` `±` is `-12.5`.
 2. Press an operator — the small line above shows what is waiting, e.g. `12 +`.
 3. Press the digits of the second number.
 4. Press `=` to see the answer. `Reset` starts a new calculation, `About` says hello.
 
 Pressing a second operator finishes the first calculation, so `2 + 3 + 4 =` gives `9` (the small line names
 the step it just did: `5 + 4 = 9`).
-After `=`, typing a digit starts a fresh number, while pressing an operator keeps using the answer.
+After `=`, typing a digit (or `.`) starts a fresh number, while pressing an operator keeps using the answer.
 
-`eˣ` and `ln` take **one** number, so they are used the other way round: type the number, then press the
-button. Pressing one while an answer is already on show works on that answer, and pressing one while a
+The one-number buttons `eˣ` and `ln` are used the other way round: type the number, then press the button
+(`√` is not one of them — it takes the order of the root as its second number: `8 √ 3 =` is `2`). Pressing one while an answer is already on show works on that answer, and pressing one while a
 calculation is waiting finishes it — `2 + 3 ln` is `2 + ln(3)`.
 
-### Operators and functions
+`±` is the exception to "number first": it acts on whatever is on show, so `3 - 5 =` then `±` shows `2`.
+
+### Operators, functions and typing
 
 | Button | Meaning | Example |
 |--------|---------|---------|
-| `+` | addition | `12 + 5 =` → `17` |
+| `+` | addition | `12.5 + 0.5 =` → `13` |
 | `-` | subtraction | `12 - 5 =` → `7` |
 | `*` | multiplication | `12 * 5 =` → `60` |
 | `/` | division | `12 / 5 =` → `2.4` |
 | `^` | power | `2 ^ 10 =` → `1024` |
 | `√` | the second number is the **order of the root**, kept from version 1 | `8 √ 3 =` → `2`, `9 √ 2 =` → `3` |
-| `ln` | natural logarithm: the power you raise e to, to get the number | `10` `ln` → `2.30258509299` |
-| `eˣ` | natural exponent: e (about 2.71828) to the power of the number | `2` `eˣ` → `7.38905609893` |
+| `eˣ` | natural exponent: e (about 2.71828) to the power of the number | `2 eˣ` → `7.38905609893` |
+| `ln` | natural logarithm: the power you raise e to, to get the number | `10 ln` → `2.30258509299` |
+| `.` | decimal point — one per number | `1 . 5` → `1.5`, `.` on its own → `0.` |
+| `±` | flips the sign of the number on show | `5 ±` → `-5`, `3 - 5 = ±` → `2` |
 
 `eˣ` and `ln` undo each other, so `5 eˣ ln` gives `5` back.
 
@@ -121,49 +127,41 @@ Bad input gets a sentence in the status line rather than a red traceback in the 
 | `3 - 5 =` then `√ 2 =` | I cannot take a root of a negative number. |
 | `8 √ 0 =` | A root cannot have the order zero. |
 | `9 ^ 9 =`, then `^ 9 =` twice | That power is too big to work out. |
-| `0 ln`, or `3 - 5 =` then `ln` | I can only take the logarithm of a number above zero. |
+| `0 ln`, or `4 ±` then `ln` | I can only take the logarithm of a number above zero. |
 | `999 eˣ` | That exponent is too big to work out. |
 | `=` before entering an operator | Type it like this:  12 + 5 = |
-| an operator or function before entering a number | Type a number first. |
+| an operator, a function or `±` before entering a number | Type a number first. |
 
 `calculate()` and `apply_function()` also refuse a negative base with a fractional exponent and anything that
 comes out infinite or too large for a float; those are hard to reach by clicking, so they are covered by
 tests rather than by a button sequence.
 
-## What changed in version 4
+## What changed in version 5
 
-* **The two buttons from issue #1.** `eˣ` (natural exponent) and `ln` (natural logarithm) sit next to each
-  other on their own row, above `Reset`.
-* **They take one number.** Type the number, press the button, and the answer is there: `2` `eˣ` shows
-  `7.38905609893`, `10` `ln` shows `2.30258509299`. Pressing one while an answer is on show works on that
-  answer, so `9 √ 2 =` then `ln` gives `1.09861228867`.
-* **They fit the flow.** If a calculation is waiting, the function is worked out first and the calculation is
-  finished with it: `2 + 3 ln` shows `2 + ln(3) = 3.09861228867`. Typing a digit afterwards starts a new
-  number, exactly as after `=`.
-* **Guarded like everything else.** `ln` of zero or of a negative number, and an exponent too big for Python
-  to work out, get a sentence in the status line instead of a traceback.
-* **In the code:** one new table (`FUNCTIONS`), one new maths function (`apply_function()`), one new button
-  handler (`press_function()`), and a small `refuse()` helper that the old calculation path and the new
-  function path share. `calculate()` itself is untouched.
-* **In the tests:** both functions are covered end to end, and `setUp` now resets the *calculator* as well as
-  the window — before this, one test could carry a half-finished calculation into the next one.
+* **A decimal point.** `.` starts `0.` when nothing has been typed and appends otherwise, a second dot in the
+  same number is ignored, and a half-typed `12.` is still `12`, so `12 . + 5 =` gives `17`.
+* **A sign button.** `±` flips the number being typed (`5 ± 2` is `-52`, which is what you were typing) and it
+  flips an answer too: `3 - 5 =` shows `-2`, then `±` shows `2`, with `-(-2) = 2` in the status line. `-0` is
+  shown as `0`, which meant teaching `format_number()` that negative zero is zero.
+* **They sit with the digits.** `.` and `±` take the bottom digit row (`0 . ± +`), and `√` and `^` moved up to
+  join `ln` and `eˣ` on one function row — the keypad is still four columns wide and the window is the same
+  height as before.
+* **In the code:** `press_digit()` and the new `press_decimal_point()` share one
+  `begin_a_new_number_if_needed()` rule, and `press_sign()` is a third kind of button handler next to
+  `press_operator()` and `press_function()`.
+* **In the tests:** 15 new tests cover the two buttons end to end, including the issue's own example
+  (`-12.5 + 0.5 = -12`), a negative number meeting `ln` and `eˣ`, and a decimal-plus-sign sequence on a real
+  window.
 
-## What changed in version 3
+### Earlier versions
 
-* **One keypad.** Version 2 had two identical sets of digit buttons (one for each operand). Now there is a
-  single conventional grid and the program tracks which number you are typing.
-* **A handler per kind of button, not per button.** Version 1 had 26 hand-written click handlers; version 2
-  merged the digits into `num_1_update` / `num_2_update`; version 3 uses `press_digit(digit)` and
-  `press_operator(operator)`, driven by the `KEYPAD` table in `build_window()`.
-* **No `global` lines.** The state lives in one `SimpleNamespace` called `state`, and the handlers reach the
-  labels through it.
-* **Guarded maths.** `calculate()` raises `ValueError` with a readable message for division by zero, an
-  impossible root, a negative base with a fractional exponent, infinity and overflow.
-* **Tidier numbers.** Results are formatted with `.12g`, so `1 / 3` shows as `0.333333333333` and
-  `0.1 + 0.2` shows as `0.3` instead of `0.30000000000000004`.
-* **One result popup.** Pressing `=` reuses the popup window instead of piling up a new one every time.
-* **Helpful startup.** A missing Tk install is explained instead of raising `ImportError`, and the module
-  can be imported without Tk, which keeps the maths testable.
+* **Version 4** — `eˣ` and `ln`, so the calculator could do more than arithmetic, plus the `FUNCTIONS` table
+  and `apply_function()` they are built on.
+* **Version 3** — one keypad instead of two pads, a handler per *kind* of button instead of per button, no
+  `global` lines, guarded maths with readable messages, tidier numbers (`.12g`), one reused result popup, and
+  a helpful message when the Tk libraries are missing.
+* **Version 2** — numbers kept as text, three handlers instead of 26, and the black/`SpringGreen2` look.
+* **Version 1** — the original: two digit pads, whole numbers, Tk's default look, no error handling.
 
 ## Tests
 
@@ -172,7 +170,7 @@ install:
 
 | File | What it checks | Needs |
 |------|----------------|-------|
-| `test_calculator.py` | the maths, every operator, both one-number functions, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
+| `test_calculator.py` | the maths, every operator, the one-number functions, typing decimals and signs, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
 | `test_gui_smoke.py` | the same buttons on a **real** Tk window — real widgets, real clicks, no errors inside Tk — and then starts `Calculator.py` to see that its window stays open. | tkinter, the Tcl/Tk libraries and a display; it skips itself when one of those is missing |
 
 Run them:
@@ -191,11 +189,17 @@ Every push and pull request runs them in
 
 ## Known limits
 
-* No decimal point button (the original had none either) and no way to type a negative number directly —
-  but `3 - 5` gives `-2` and you can carry on calculating from it.
-* `eˣ` and `ln` are used as *number, then button*. There is no `ln` `10` `=` order, and no `e` or `ln`
-  buttons for the second number of a calculation.
-* The result popup belongs to `=`; `eˣ` and `ln` answer in the big display and the status line.
-* Numbers are shown rounded to 12 significant digits, so very long results are shortened.
-* Very large or very small results are printed in scientific notation, e.g. `1e+20`.
-* No history, no keyboard shortcuts — only the buttons.
+* One decimal point per number, and no scientific notation to type — `1e-5` cannot be entered.
+* `±` flips the whole number; there is no way to negate just part of an expression.
+* `±` needs a number on show: pressing it while an operator is waiting for its second number says
+  `Type a number first.`
+* The result popup belongs to `=`; the one-number buttons answer in the big display and the status line.
+* Numbers are shown rounded to 12 significant digits, so very long results are shortened; very large or very
+  small ones come out in scientific notation, e.g. `1e+20`.
+* No history and no keyboard shortcuts yet — those are the next ideas, in
+  [#8](https://github.com/sensocc/Basic-Python-Calculator/issues/8) and
+  [#7](https://github.com/sensocc/Basic-Python-Calculator/issues/7), along with
+  [#4](https://github.com/sensocc/Basic-Python-Calculator/issues/4) log₁₀ and percent,
+  [#5](https://github.com/sensocc/Basic-Python-Calculator/issues/5) trig with a degrees/radians switch,
+  [#6](https://github.com/sensocc/Basic-Python-Calculator/issues/6) π and e, and
+  [#9](https://github.com/sensocc/Basic-Python-Calculator/issues/9) the interface overhaul.
