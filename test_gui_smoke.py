@@ -6,7 +6,10 @@ Run them with:
 
 These need Python's tkinter, the Tcl/Tk libraries and a display. When any of the
 three is missing they skip themselves, so `python3 -m unittest discover` is safe
-to run anywhere. On GitHub Actions they run under `xvfb-run`, which provides a
+to run anywhere.
+
+One test maps its window for a moment: Tk only delivers key events to a window
+that is mapped and focused, so a withdrawn one silently receives nothing. On GitHub Actions they run under `xvfb-run`, which provides a
 display; on your own machine without a desktop session the same works:
 
     xvfb-run -a python3 -m unittest -v test_gui_smoke
@@ -82,7 +85,7 @@ class TestRealWindow(unittest.TestCase):
             buttons = {widget.cget("text"): widget
                        for widget in root.winfo_children()
                        if isinstance(widget, real_button)}
-            self.assertEqual(len(buttons), 32, "the keypad is not complete")
+            self.assertEqual(len(buttons), 33, "the keypad is not complete")
 
             def press(*labels):
                 for label in labels:
@@ -128,6 +131,9 @@ class TestRealWindow(unittest.TestCase):
             press("Reset", "2", "+", "e")
             self.assertEqual(calculator.state.display_label.cget("text"), "4.71828182846")
 
+            press("Reset", "1", "2", "3", "⌫")        # the backspace from issue #7
+            self.assertEqual(calculator.state.display_label.cget("text"), "12")
+
             press("About")            # opens a real Toplevel with real Labels
             press("=")
             self.assertEqual(callback_errors, [], "a button raised inside Tk")
@@ -135,6 +141,47 @@ class TestRealWindow(unittest.TestCase):
             root.destroy()
         finally:
             tkinter.Tk, tkinter.Toplevel = real_tk, real_toplevel
+
+    def test_the_keyboard_works_on_a_real_window(self):
+        """Real key events, which is the part of issue #7 that fails silently.
+
+        Tk hands key events to the focused window, and a withdrawn window cannot
+        be focused: generating them there does nothing at all, with no error. So
+        this test shows the window for the moment it takes to type, which is the
+        only way to prove the binding really works.
+        """
+        calculator = load_calculator()
+        root = calculator.build_window()
+        try:
+            root.deiconify()
+            root.update()
+            root.focus_force()
+            root.update()
+
+            def type_key(keysym):
+                root.event_generate("<KeyPress>", keysym=keysym)
+                root.update()
+
+            for keysym in ("1", "2", "plus", "5"):     # 12 + 5, typed
+                type_key(keysym)
+            type_key("Return")
+            self.assertEqual(calculator.state.display_label.cget("text"), "17")
+            self.assertEqual(calculator.state.status_label.cget("text"), "12 + 5 = 17")
+
+            type_key("Escape")
+            self.assertEqual(calculator.state.display_label.cget("text"), "0")
+
+            type_key("asterisk")                       # Tk's name for the * key
+            self.assertEqual(calculator.state.status_label.cget("text"), "Type a number first.")
+
+            for keysym in ("7", "8", "BackSpace"):     # the ⌫ key
+                type_key(keysym)
+            self.assertEqual(calculator.state.display_label.cget("text"), "7")
+
+            type_key("F5")                             # not wired up: does nothing
+            self.assertEqual(calculator.state.display_label.cget("text"), "7")
+        finally:
+            root.destroy()
 
     def test_the_app_starts_and_keeps_its_window_open(self):
         """Run Calculator.py the way a person would, and see that it stays up."""

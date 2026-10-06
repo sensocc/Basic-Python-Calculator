@@ -1,6 +1,16 @@
-"""A small Tkinter calculator - version 8.
+"""A small Tkinter calculator - version 9.
 
-Version 8 adds the two constants asked for in issue #6:
+Version 9 adds the keyboard and the backspace key asked for in issue #7:
+
+* the keyboard types what the buttons do: the digits, `.`, `+ - * / ^ %`, `=` or
+  Enter for the answer, Escape for Reset, and Backspace to take a character off
+* `⌫` on the keypad does the same thing as the Backspace key
+
+The keys are wired to the same handlers the buttons use, so there is no second
+copy of the logic to keep in step, and a key that is not in the map does
+nothing at all.
+
+Version 8 added the two constants asked for in issue #6:
 
 * `π` - 3.141592653589793
 * `e` - 2.718281828459045
@@ -70,7 +80,8 @@ KEYPAD = (
     ("√", 6, 0, 1), ("^", 6, 1, 1), ("ln", 6, 2, 1), ("eˣ", 6, 3, 1),
     ("log", 7, 0, 1), ("%", 7, 1, 1), ("sin", 7, 2, 1), ("cos", 7, 3, 1),
     ("tg", 8, 0, 1), ("ctg", 8, 1, 1), ("π", 8, 2, 1), ("e", 8, 3, 1),
-    ("DEG", 9, 0, 1), ("Reset", 9, 1, 1), ("=", 9, 2, 1), ("About", 9, 3, 1),
+    ("⌫", 9, 0, 2), ("DEG", 9, 2, 2),
+    ("Reset", 10, 0, 1), ("=", 10, 1, 2), ("About", 10, 3, 1),
 )
 
 # The whole calculator state lives here, so no function needs a `global` line.
@@ -87,6 +98,7 @@ state = SimpleNamespace(
     status="",           # the small line above the big number
     error=None,          # a message to show instead of the status line
     angle_mode="deg",    # what sin, cos, tg and ctg measure angles in
+    keys=None,           # what each keyboard key does, filled in when the window is built
 )
 
 
@@ -435,6 +447,25 @@ def press_function(function):
     update_display()
 
 
+def press_backspace():
+    """Take the last character off the number being typed.
+
+    With nothing being typed it just tidies the message line away, so the key
+    does something sensible rather than nothing at all.
+    """
+    state.error = None
+
+    if state.entry:
+        state.entry = state.entry[:-1]
+        if state.entry == "-":
+            state.entry = ""          # a lone minus sign is not a number
+        update_display()
+        return
+
+    state.status = ""
+    update_display()
+
+
 def press_constant(name):
     """Put π or e on show.
 
@@ -523,7 +554,7 @@ def open_about_window():
     window.configure(bg=BACKGROUND)
     tk.Label(
         window,
-        text="VER 8.0! Made by Sasha!",
+        text="VER 9.0! Made by Sasha!",
         padx=20,
         pady=20,
         font=FONT,
@@ -532,7 +563,7 @@ def open_about_window():
     ).pack()
     tk.Label(
         window,
-        text="Version 8: the constants π and e, from issue #6.",
+        text="Version 9: the keyboard and ⌫, from issue #7.",
         padx=20,
         font=SMALL_FONT,
         bg=BACKGROUND,
@@ -540,12 +571,57 @@ def open_about_window():
     ).pack(pady=(0, 20))
 
 
+def build_key_map():
+    """Which keyboard key does what.
+
+    Every entry calls the handler the matching button calls, so there is no
+    second copy of the logic to keep in step. Both the name Tk gives a key and
+    the character it types are in here, because Tk calls the `*` key
+    `asterisk`; the numeric keypad is in as well. Anything missing from the map
+    is ignored, so an unrelated key never does anything surprising.
+    """
+    keys = {}
+
+    def add(action, *names):
+        for name in names:
+            keys[name] = action
+
+    for digit in "0123456789":
+        add(lambda digit=digit: press_digit(digit), digit, "KP_" + digit)
+    for operator in "+-*/^":
+        add(lambda operator=operator: press_operator(operator), operator)
+    add(lambda: press_operator("+"), "KP_Add")
+    add(lambda: press_operator("-"), "KP_Subtract")
+    add(lambda: press_operator("*"), "KP_Multiply")
+    add(lambda: press_operator("/"), "KP_Divide")
+    add(press_decimal_point, ".", "period", "KP_Decimal")
+    add(lambda: press_function("percent"), "%", "percent")
+    add(press_equals, "=", "equal", "Return", "KP_Enter")
+    add(press_reset, "Escape")
+    add(press_backspace, "BackSpace")
+    return keys
+
+
+def on_key(event):
+    """Do what the matching button does for a key, and nothing for any other key.
+
+    Returning "break" stops Tk from handing the same key on to a button that
+    happens to have the keyboard focus, which would otherwise do everything
+    twice.
+    """
+    action = state.keys.get(event.keysym) or state.keys.get(event.char)
+    if action is None:
+        return None
+    action()
+    return "break"
+
+
 # --- starting up -------------------------------------------------------------
 
 def build_window():
     """Create the calculator window and remember its widgets on state."""
     root = tk.Tk()
-    root.title("My Fancy-Shmancy Calculator V8")
+    root.title("My Fancy-Shmancy Calculator V9")
     root.configure(bg=BACKGROUND)
     state.root = root
 
@@ -572,6 +648,8 @@ def build_window():
             command = press_sign
         elif label in CONSTANTS:
             command = lambda name=label: press_constant(name)
+        elif label == "⌫":
+            command = press_backspace
         elif label == "DEG":
             command = press_angle_mode
         elif label == "Reset":
@@ -586,9 +664,12 @@ def build_window():
 
     for column in range(4):
         root.columnconfigure(column, weight=1)
-    for row in range(2, 10):
+    state.keys = build_key_map()
+    root.bind("<Key>", on_key)
+
+    for row in range(2, 11):
         root.rowconfigure(row, weight=1)
-    root.minsize(360, 610)
+    root.minsize(360, 670)
     return root
 
 
