@@ -85,7 +85,7 @@ class TestRealWindow(unittest.TestCase):
             buttons = {widget.cget("text"): widget
                        for widget in root.winfo_children()
                        if isinstance(widget, real_button)}
-            self.assertEqual(len(buttons), 34, "the keypad is not complete")
+            self.assertEqual(len(buttons), 35, "the keypad is not complete")
 
             def press(*labels):
                 for label in labels:
@@ -153,6 +153,62 @@ class TestRealWindow(unittest.TestCase):
             press("=")
             self.assertEqual(callback_errors, [], "a button raised inside Tk")
 
+            root.destroy()
+        finally:
+            tkinter.Tk, tkinter.Toplevel = real_tk, real_toplevel
+
+    def test_the_themes_work_on_a_real_window(self):
+        """Real colours on real widgets, including a window that is already open."""
+        real_tk, real_toplevel, real_button = tkinter.Tk, tkinter.Toplevel, tkinter.Button
+        callback_errors = []
+
+        class HiddenTk(real_tk):
+            def __init__(self, *args, **options):
+                super().__init__(*args, **options)
+                self.withdraw()
+                self.report_callback_exception = lambda *info: callback_errors.append(
+                    info[0].__name__ + ": " + str(info[1]))
+
+        class HiddenToplevel(real_toplevel):
+            def __init__(self, *args, **options):
+                super().__init__(*args, **options)
+                self.withdraw()
+
+        tkinter.Tk, tkinter.Toplevel = HiddenTk, HiddenToplevel
+        try:
+            calculator = load_calculator()
+            root = calculator.build_window()
+            root.update_idletasks()
+            buttons = {widget.cget("text"): widget
+                       for widget in root.winfo_children()
+                       if isinstance(widget, real_button)}
+            self.assertEqual(len(buttons), 35)
+
+            # the font is one this machine really has, and it can draw the keypad
+            family = calculator.state.font_family
+            self.assertIn(family, set(tkinter.font.families()))
+            self.assertTrue(calculator.can_draw(family), "the chosen font lacks a keypad glyph")
+
+            self.assertEqual(root.cget("background"), "black")
+            self.assertEqual(buttons["7"].cget("background"), "black")
+
+            buttons["About"].invoke()                      # a window left open
+            about = [widget for widget in root.winfo_children()
+                     if isinstance(widget, real_toplevel)][-1]
+            about_label = about.winfo_children()[0]
+
+            buttons["Theme"].invoke()                      # Terminal -> Light
+            root.update_idletasks()
+            self.assertEqual(calculator.state.theme, "Light")
+            self.assertEqual(root.cget("background"), "#f2f3f5")
+            self.assertEqual(buttons["7"].cget("background"), "#e4e7eb")
+            self.assertEqual(buttons["7"].cget("activebackground"), "#cbd2da")
+            self.assertEqual(calculator.state.display_label.cget("background"), "#ffffff")
+            self.assertEqual(about_label.cget("background"), "#f2f3f5",
+                             "the window that was already open did not follow the theme")
+
+            self.assertTrue(root.cget("menu"), "there is no menu bar")
+            self.assertEqual(callback_errors, [])
             root.destroy()
         finally:
             tkinter.Tk, tkinter.Toplevel = real_tk, real_toplevel

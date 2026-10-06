@@ -1,4 +1,4 @@
-# Basic Python Calculator — version 10
+# Basic Python Calculator — version 11
 
 [![Tests](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml)
 
@@ -7,15 +7,15 @@ Type the first number, pick an operator, type the second number, press `=` — t
 window and in a small popup. The numbers can be decimals, and the `±` button makes them negative. There are
 one-number buttons for `eˣ`, `ln`, `log`, `%`, and for the trigonometry `sin`, `cos`, `tg` and `ctg` — those
 four with a `DEG` / `RAD` switch — plus the two constants `π` and `e`. Everything can be done from the
-keyboard as well, and every finished calculation is kept in a history you can pick answers back out of.
-Made by Sasha.
+keyboard, every finished calculation is kept in a history you can pick answers back out of, and the whole
+thing comes in five colour themes. Made by Sasha.
 
-**This is version 10**, the newest one, tagged `v10.0`: the history that [issue #8][issue] asked for, on top
-of the tests and the workflow that keep the calculator working.
+**This is version 11**, the newest one, tagged `v11.0`: the interface overhaul that [issue #9][issue] asked
+for. That was the last idea on the list — every issue in this repository is now built.
 
-[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/8
+[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/9
 
-## The ten versions
+## The eleven versions
 
 This repository keeps every version of the calculator as a version of **one file** — `Calculator.py`, each
 with its own `README.md` — instead of several files sitting side by side:
@@ -31,7 +31,8 @@ with its own `README.md` — instead of several files sitting side by side:
 | `v7.0` | Adds `sin`, `cos`, `tg` and `ctg`, and the `DEG` / `RAD` switch they obey. | `git checkout v7.0` |
 | `v8.0` | Adds the constants `π` and `e`. | `git checkout v8.0` |
 | `v9.0` | Adds keyboard input and the `⌫` button. | `git checkout v9.0` |
-| `v10.0` | **This version.** Adds the calculation history and its window. | `git checkout v10.0` |
+| `v10.0` | Adds the calculation history and its window. | `git checkout v10.0` |
+| `v11.0` | **This version.** Five colour themes, chosen from a menu or a button, and a modernised look. | `git checkout v11.0` |
 
 Every tag is also a GitHub Release, so any version can be downloaded as a zip without using git.
 
@@ -74,9 +75,11 @@ This calculator needs Python's tkinter toolkit, and Tk is not installed.
 ## How to use it
 
 ```
-                      12 +
-                     ______
-                          5     <- the big number is what you are typing
+  ┌ Theme ▾ ┬ Help ▾ ┐           <- a menu bar: the themes, About and Quit
+  │                 │
+  │          12 +   │           <- the small line says what is waiting
+  │             __  │
+  │              5  │           <- the big number is what you are typing
   ┌────┬────┬────┬────┐
   │ 7  │ 8  │ 9  │ /  │
   ├────┼────┼────┼────┤
@@ -91,12 +94,15 @@ This calculator needs Python's tkinter toolkit, and Tk is not installed.
   │log │ %  │sin │cos │
   ├────┼────┼────┼────┤
   │ tg │ctg │ π  │ e  │
-  ├────┼────┼────┴────┤
-  │ ⌫  │DEG │ History │
-  ├────┼────┼────┬────┤
+  ├────┼────┼────┼────┤
+  │ ⌫  │DEG │Hist│Them│
+  ├────┼────┼────┼────┤
   │Reset│   =    │About│
   └─────┴────────┴─────┘
 ```
+
+The buttons light up while the pointer is over them, and the whole grid grows with the window instead of
+leaving a gap in a corner.
 
 1. Press the digits of the first number. Decimals and negatives are typed the same way: `.` starts `0.` and
    `±` flips the sign, so `12` `.` `5` `±` is `-12.5`.
@@ -120,6 +126,27 @@ Two kinds of button are the exceptions to "number first":
   `4.14159265359`, and a digit typed afterwards starts a fresh number rather than adding to the digits of π.
   If a calculation is waiting, the constant is its last number: `2 + π` shows `2 + π = 5.14159265359` there
   and then.
+
+### Themes
+
+Five themes ship with the calculator:
+
+| Theme | What it looks like |
+|-------|--------------------|
+| `Terminal` | the original look: black, with SpringGreen2 for everything |
+| `Light` | paper white, near-black text, light grey buttons |
+| `Dark` | soft charcoal with a muted mint number — dark, but not glaring |
+| `Solarized Light` | the [Solarized](https://ethanschoonover.com/solarized/) palette on its light background |
+| `Solarized Dark` | the same palette on its dark background |
+
+Change it in either of two ways:
+
+* the **Theme menu** in the menu bar, which lists all five and ticks the one in use, or
+* the **Theme button** on the keypad, which steps to the next one each time it is pressed (and wraps round).
+
+Switching repaints **every window**, including the About, result and history windows if they happen to be
+open. The theme is a setting, like the `DEG` / `RAD` switch, so `Reset` leaves it alone — and it is not
+remembered between runs, so the calculator always starts on `Terminal`.
 
 ### The calculation history
 
@@ -163,7 +190,7 @@ The keyboard does what the buttons do, so `1` `2` `+` `5` and Enter gives `17` w
 
 A key that is not in that table does nothing at all — no beeps, no surprises. The window has to be the
 focused one, and the letter-named buttons (`ln`, `log`, `sin`, `cos`, `tg`, `ctg`, `π`, `e`, `±`, `DEG`,
-`History`) are mouse-only for now.
+`History`, `Theme`) are mouse-only for now.
 
 ### Angles: the DEG / RAD switch
 
@@ -197,6 +224,7 @@ sum you are working on.
 | `±` | flips the sign of the number on show | `5 ±` → `-5`, `3 - 5 = ±` → `2` |
 | `⌫` | takes one character off the number being typed | `1 2 3 ⌫` → `12` |
 | `History` | lists the finished calculations in their own window | pick one to put its answer back on show |
+| `Theme` | steps to the next colour theme | press it five times to come back where you started |
 
 `eˣ` and `ln` undo each other, so `5 eˣ ln` gives `5` back — and `e ln` is `1`, since the natural logarithm of
 `e` is what it was built on.
@@ -222,27 +250,31 @@ Bad input gets a sentence in the status line rather than a red traceback in the 
 comes out infinite or too large for a float; those are hard to reach by clicking, so they are covered by
 tests rather than by a button sequence.
 
-## What changed in version 10
+## What changed in version 11
 
-* **A history of finished calculations.** Every calculation that comes out — a `=` result, the answer from a
-  one-number button, a step finished by a second operator, or a function finishing a waiting calculation —
-  is filed newest first, with both what it said and the answer it produced.
-* **Its own window.** `History` shows the list numbered, in the same black and green as the rest of the app,
-  and the window is reused and rebuilt rather than stacked when it is opened again.
-* **Picking an entry carries on from it.** Its answer goes back on the display as a finished value, so
-  `10 + 5 =`, pick `15`, then `* 2 =` gives `30`.
-* **`Clear` empties it, and it is capped at 20.** The oldest drop off, and nothing is written to disk — the
-  list lives as long as the window does. A refused calculation never reaches it, and neither does pressing
-  `π` on its own, since nothing was worked out.
-* **One smaller refactor:** `finish_calculation()` now builds the `12 + 5 = 17` text itself, so
-  `press_equals()` no longer assembles the same string a second time to put it on the status line.
-* **In the layout:** `⌫`, `DEG` and the new `History` share the row above the bottom one, so the keypad is
-  still ten rows and the window has not grown.
-* **In the tests:** 14 new ones — what is filed and what is not, the order, the cap, picking an answer back
-  up and carrying on with it, the empty window, the reused window, and `Clear`.
+* **Five colour themes**, in a `THEMES` table: `Terminal` (the old black and green), `Light`, `Dark` and the
+  two Solarized palettes. Each theme names a colour for every part of a window — the window, the number area,
+  the number, the small line, the button faces, the button text, and the colour a button takes under the
+  pointer.
+* **Two ways to change it:** a Theme menu in a new menu bar (with ticks, so you can see where you are), and a
+  Theme button on the keypad that steps to the next theme and wraps round.
+* **Every window follows**, including ones already open. That is what the `themed` register is for: each
+  widget is painted from the theme and remembered, so a change is one loop over the register. Closed windows
+  are forgotten as it goes.
+* **A font this machine really has.** The old code asked for `Arial`, which is not installed everywhere — not
+  on this machine — and Tk quietly substitutes something else. Now the family is chosen from everything
+  installed, and then *checked against the odd characters on the keypad* (`√ ⌫ ± ÷ π ° eˣ`), falling back to
+  Tk's own default font if the first choices cannot draw them. On this machine that lands on
+  `Liberation Sans`, which has all seven.
+* **A roomier look**: the number is 30pt instead of 18pt, the buttons have padding inside and out, and they
+  use Tk's active state to light up under the pointer. The status line got its own quieter colour.
+* **In the tests:** 14 new ones for the theming and the font choice, plus a real-window test that switches
+  theme and checks the actual colours of the main window, a button, the number area *and a window that was
+  already open*.
 
 ### Earlier versions
 
+* **Version 10** — the calculation history, its window and picking old answers back up.
 * **Version 9** — keyboard input (digits, `.`, the operators, Enter, Escape, Backspace, numeric keypad) and
   the `⌫` button.
 * **Version 8** — the constants `π` and `e`, plus the `finish_with()` helper they share with the function
@@ -267,8 +299,8 @@ install:
 
 | File | What it checks | Needs |
 |------|----------------|-------|
-| `test_calculator.py` | the maths, every operator, the one-number and angle functions, the constants, typing decimals and signs, the key map, the backspace, the history, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
-| `test_gui_smoke.py` | the same buttons on a **real** Tk window, real clicks, **real key events** and a real history window — no errors inside Tk — and then starts `Calculator.py` to see that its window stays open. | tkinter, the Tcl/Tk libraries and a display; it skips itself when one of those is missing |
+| `test_calculator.py` | the maths, every operator, the one-number and angle functions, the constants, typing decimals and signs, the key map, the backspace, the history, the themes and the font choice, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
+| `test_gui_smoke.py` | the same buttons on a **real** Tk window: real clicks, real key events, a real history window, real colours when the theme changes, and the font checked against the installed ones — and then starts `Calculator.py` to see that its window stays open. | tkinter, the Tcl/Tk libraries and a display; it skips itself when one of those is missing |
 
 Run them:
 
@@ -286,13 +318,21 @@ Every push and pull request runs them in
 
 ## Known limits
 
+* The theme is not remembered between runs: the calculator always starts on `Terminal`. Nothing is written to
+  disk, which also means no file to go stale or fail on a read-only folder.
+* The five themes are built in; there is no way to add your own without editing the `THEMES` table.
+* Where a menu bar appears is up to the system: on macOS it goes to the top of the screen rather than into the
+  window, which is the platform's own behaviour.
+* The "lighting up" of a button is Tk's active state, so it appears while the pointer is over a button; there
+  is no separate animation or rounded corners — plain Tk cannot draw those without extra dependencies.
 * The history is kept in memory only: it does not survive closing the calculator, and there is no way to save
   it to a file.
 * It holds the last 20 calculations. Older ones drop off silently — there is no "more" to scroll back to.
 * Entries cannot be edited or deleted one at a time; `Clear` empties the lot.
-* `Reset` does not empty the history, since the history is a record rather than part of the sum.
+* `Reset` does not empty the history, and does not change the theme: both are settings rather than part of the
+  sum.
 * The keyboard only covers the keys that mean something on a keypad: the letter-named buttons (`ln`, `log`,
-  `sin`, `cos`, `tg`, `ctg`, `π`, `e`, `±`, `DEG`, `History`) have no shortcuts yet.
+  `sin`, `cos`, `tg`, `ctg`, `π`, `e`, `±`, `DEG`, `History`, `Theme`) have no shortcuts.
 * Keys are only seen by the focused window, and the window has to be mapped — a minimised or hidden one gets
   nothing.
 * `π` and `e` cannot be edited digit by digit: pressing one replaces what is on show, and a digit afterwards
@@ -308,6 +348,3 @@ Every push and pull request runs them in
 * The result popup belongs to `=`; the one-number buttons answer in the big display and the status line.
 * Numbers are shown rounded to 12 significant digits, so very long results are shortened; very large or very
   small ones come out in scientific notation, e.g. `1e+20`.
-* The one idea left on the list is the interface overhaul,
-  [issue #9](https://github.com/sensocc/Basic-Python-Calculator/issues/9): layout, styling and switchable
-  colour themes.

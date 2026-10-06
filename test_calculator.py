@@ -39,6 +39,12 @@ class TclError(Exception):
 # children the way Tk would be asked.
 EVERY_WIDGET = []
 
+# What the stand-in machine has installed, and which characters each family has
+# no glyph for. A test can take one away and watch the font choice move on.
+FAMILIES = ("DejaVu Sans", "Liberation Sans", "Noto Sans", "Arial")
+DEFAULT_FAMILY = "Liberation Sans"
+CANNOT_DRAW = {}
+
 
 class FakeWidget:
     instances = []
@@ -125,6 +131,52 @@ class FakeButton(FakeWidget):
     pass
 
 
+class FakeMenu(FakeWidget):
+    """Enough of a menu to see what is on it and to choose something."""
+
+    def __init__(self, master=None, **options):
+        super().__init__(master, **options)
+        self.entries = []
+        self.cascades = {}
+
+    def add_radiobutton(self, label, variable=None, value=None, command=None, **options):
+        self.entries.append((label, lambda: (variable.set(value), command())[1]))
+
+    def add_command(self, label, command=None, **options):
+        self.entries.append((label, command))
+
+    def add_cascade(self, label, menu=None, **options):
+        self.entries.append((label, None))
+        self.cascades[label] = menu
+
+
+class FakeStringVar:
+    def __init__(self, value=""):
+        self.value = value
+
+    def get(self):
+        return self.value
+
+    def set(self, value):
+        self.value = value
+
+
+class FakeFont:
+    def __init__(self, family="", size=0, **options):
+        self.family = family
+        self.size = size
+
+    def measure(self, text):
+        """A width for every character the family can draw, and none for the rest."""
+        missing = CANNOT_DRAW.get(self.family, "")
+        if any(character in missing for character in text):
+            return 0
+        return 10 * len(text)
+
+    def actual(self, option="family"):
+        return self.family if option == "family" else self.size
+
+
 WIDGETS = (FakeTk, FakeToplevel, FakeLabel, FakeButton)
 for widget in WIDGETS:
     widget.instances = []
@@ -133,13 +185,21 @@ for widget in WIDGETS:
 def load_calculator():
     """Import Calculator.py with the stand-in in place of tkinter."""
     already_imported = sys.modules.pop("tkinter", None)
+    fonts = types.ModuleType("tkinter.font")
+    fonts.families = lambda: list(FAMILIES)
+    fonts.Font = FakeFont
+    fonts.nametofont = lambda name: FakeFont(DEFAULT_FAMILY)
     stand_in = types.ModuleType("tkinter")
     stand_in.Tk = FakeTk
     stand_in.Toplevel = FakeToplevel
     stand_in.Label = FakeLabel
     stand_in.Button = FakeButton
+    stand_in.Menu = FakeMenu
+    stand_in.StringVar = FakeStringVar
     stand_in.TclError = TclError
+    stand_in.font = fonts
     sys.modules["tkinter"] = stand_in
+    sys.modules["tkinter.font"] = fonts
     try:
         # A name of its own, so this file never shares a module with
         # test_gui_smoke.py, which loads Calculator.py with the real tkinter.
@@ -152,6 +212,7 @@ def load_calculator():
             sys.modules.pop("tkinter", None)
         else:
             sys.modules["tkinter"] = already_imported
+        sys.modules.pop("tkinter.font", None)
     return module
 
 
@@ -168,6 +229,10 @@ class KeypadTestCase(unittest.TestCase):
         Calculator.state.result_window = None
         Calculator.state.result_label = None
         Calculator.state.history_window = None
+        # The theme is a setting too, and has to be back in place *before* the
+        # window is built, since that is when every widget is painted.
+        Calculator.state.theme = "Terminal"
+        CANNOT_DRAW.clear()
         self.root = Calculator.build_window()
         self.buttons = {widget.cget("text"): widget for widget in FakeButton.instances}
         # A new window is not a new calculator: the state has to be cleaned out too,
@@ -196,9 +261,9 @@ class KeypadTestCase(unittest.TestCase):
 
 
 class TestLayout(KeypadTestCase):
-    def test_there_are_thirty_four_buttons(self):
-        self.assertEqual(len(Calculator.KEYPAD), 34)
-        self.assertEqual(len(self.buttons), 34)
+    def test_there_are_thirty_five_buttons(self):
+        self.assertEqual(len(Calculator.KEYPAD), 35)
+        self.assertEqual(len(self.buttons), 35)
 
     def test_every_keypad_entry_has_a_button(self):
         for entry in Calculator.KEYPAD:
@@ -215,7 +280,7 @@ class TestLayout(KeypadTestCase):
                                    ("√", 6, 0), ("ln", 6, 2), ("eˣ", 6, 3),
                                    ("log", 7, 0), ("sin", 7, 2), ("cos", 7, 3),
                                    ("tg", 8, 0), ("ctg", 8, 1), ("π", 8, 2), ("e", 8, 3),
-                                   ("⌫", 9, 0), ("DEG", 9, 1), ("History", 9, 2),
+                                   ("⌫", 9, 0), ("DEG", 9, 1), ("History", 9, 2), ("Theme", 9, 3),
                                    ("Reset", 10, 0), ("=", 10, 1), ("About", 10, 3)):
             options = self.buttons[label].grid_options
             self.assertEqual((options["row"], options["column"]), (row, column),
@@ -244,7 +309,7 @@ class TestLayout(KeypadTestCase):
         self.assertLess(status["row"], display["row"])
 
     def test_the_window_has_a_title(self):
-        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V10")
+        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V11")
 
 
 class TestTheMaths(unittest.TestCase):
@@ -451,8 +516,8 @@ class TestButtons(KeypadTestCase):
         self.assertEqual(about.title_text, "About This App")
         labels = [widget.cget("text") for widget in FakeLabel.instances
                   if widget.master is about]
-        self.assertEqual(labels, ["VER 10.0! Made by Sasha!",
-                                 "Version 10: the calculation history, from issue #8."])
+        self.assertEqual(labels, ["VER 11.0! Made by Sasha!",
+                                 "Version 11: five colour themes, from issue #9."])
 
 
 class TestTypingDecimalsAndSigns(KeypadTestCase):
@@ -529,6 +594,116 @@ class TestTypingDecimalsAndSigns(KeypadTestCase):
     def test_the_sign_button_after_an_operator_with_no_number(self):
         self.press("2", "+", "±")
         self.assertEqual(self.status(), "Type a number first.")
+
+
+class TestTheThemes(KeypadTestCase):
+    """The themes and the font choice, from issue #9."""
+
+    def colours(self, widget):
+        return {key: value for key, value in widget.options.items()
+                if key in ("background", "foreground", "activebackground", "activeforeground")}
+
+    def test_every_theme_colours_every_part(self):
+        parts = {"window", "display", "text", "status", "button", "button_text", "button_active"}
+        self.assertEqual(sorted(Calculator.THEME_NAMES),
+                         ["Dark", "Light", "Solarized Dark", "Solarized Light", "Terminal"])
+        for name in Calculator.THEME_NAMES:
+            with self.subTest(theme=name):
+                self.assertEqual(set(Calculator.THEMES[name]), parts)
+
+    def test_it_starts_on_terminal(self):
+        self.assertEqual(Calculator.state.theme, "Terminal")
+        self.assertEqual(self.colours(self.root)["background"], "black")
+        self.assertEqual(self.colours(self.buttons["7"])["background"], "black")
+        self.assertEqual(self.colours(self.buttons["7"])["foreground"], "SpringGreen2")
+
+    def test_the_button_steps_to_the_next_theme(self):
+        self.press("Theme")
+        self.assertEqual(Calculator.state.theme, "Light")
+        self.assertEqual(self.status(), "Theme: Light")
+        self.press("Theme")
+        self.assertEqual(Calculator.state.theme, "Dark")
+
+    def test_stepping_all_the_way_round_comes_back(self):
+        for _ in range(len(Calculator.THEME_NAMES)):
+            self.press("Theme")
+        self.assertEqual(Calculator.state.theme, "Terminal")
+
+    def test_every_button_is_repainted(self):
+        self.press("Theme")                       # Light
+        for label, button in self.buttons.items():
+            with self.subTest(button=label):
+                self.assertEqual(self.colours(button)["background"], "#e4e7eb")
+                self.assertEqual(self.colours(button)["foreground"], "#1b1f24")
+                self.assertEqual(self.colours(button)["activebackground"], "#cbd2da")
+
+    def test_the_number_area_has_its_own_colour(self):
+        self.press("Theme")                       # Light
+        self.assertEqual(self.colours(Calculator.state.display_label)["background"], "#ffffff")
+        self.assertEqual(self.colours(Calculator.state.status_label)["foreground"], "#5b6470")
+
+    def test_a_window_that_is_already_open_follows_the_theme(self):
+        self.press("About")
+        about = FakeToplevel.instances[-1]
+        labels = about.winfo_children()
+        self.press("Theme")                       # Light
+        for label in labels:
+            with self.subTest(text=label.cget("text")):
+                self.assertEqual(self.colours(label)["background"], "#f2f3f5")
+
+    def test_the_history_window_follows_the_theme(self):
+        self.press("1", "+", "1", "=", "History")
+        window = Calculator.state.history_window
+        self.press("Theme")                       # Light
+        for child in window.winfo_children():
+            # entries are buttons, the "nothing yet" line is a label
+            expected = "#e4e7eb" if isinstance(child, FakeButton) else "#f2f3f5"
+            with self.subTest(text=child.cget("text")):
+                self.assertEqual(self.colours(child)["background"], expected)
+
+    def test_a_window_opened_after_a_change_uses_the_new_colours(self):
+        self.press("Theme", "Theme")              # Dark
+        self.press("About")
+        about = FakeToplevel.instances[-1]
+        self.assertEqual(self.colours(about)["background"], "#22242a")
+
+    def test_the_menu_lists_the_themes_and_ticks_the_current_one(self):
+        menubar = self.root.options["menu"]
+        self.assertEqual([label for label, _ in menubar.entries], ["Theme", "Help"])
+        theme_menu = menubar.cascades["Theme"]
+        self.assertEqual([label for label, _ in theme_menu.entries],
+                         list(Calculator.THEME_NAMES))
+        self.assertEqual(Calculator.state.theme_var.get(), "Terminal")
+
+    def test_choosing_a_theme_from_the_menu(self):
+        menubar = self.root.options["menu"]
+        theme_menu = menubar.cascades["Theme"]
+        solarized = [action for label, action in theme_menu.entries
+                     if label == "Solarized Dark"][0]
+        solarized()
+        self.assertEqual(Calculator.state.theme, "Solarized Dark")
+        self.assertEqual(Calculator.state.theme_var.get(), "Solarized Dark")
+        self.assertEqual(self.colours(self.buttons["7"])["background"], "#073642")
+
+    def test_reset_leaves_the_theme_alone(self):
+        self.press("Theme")                       # Light
+        self.fresh()
+        self.assertEqual(Calculator.state.theme, "Light")
+        self.assertEqual(self.status(), "")
+
+    def test_the_font_is_one_this_machine_has(self):
+        self.assertEqual(Calculator.state.font_family, "DejaVu Sans")
+        self.assertEqual(Calculator.state.font, ("DejaVu Sans", 18))
+        self.assertEqual(Calculator.state.small_font, ("DejaVu Sans", 12))
+        self.assertEqual(Calculator.state.number_font, ("DejaVu Sans", 30))
+
+    def test_a_font_that_cannot_draw_the_keypad_is_passed_over(self):
+        # DejaVu Sans is first in the candidates, but not if it lacks a glyph
+        try:
+            CANNOT_DRAW["DejaVu Sans"] = "⌫"
+            self.assertEqual(Calculator.choose_font_family(), "Liberation Sans")
+        finally:
+            CANNOT_DRAW.clear()
 
 
 class TestTheHistory(KeypadTestCase):
