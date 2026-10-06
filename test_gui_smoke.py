@@ -82,7 +82,7 @@ class TestRealWindow(unittest.TestCase):
             buttons = {widget.cget("text"): widget
                        for widget in root.winfo_children()
                        if isinstance(widget, real_button)}
-            self.assertEqual(len(buttons), 23, "the keypad is not complete")
+            self.assertEqual(len(buttons), 25, "the keypad is not complete")
 
             def press(*labels):
                 for label in labels:
@@ -109,6 +109,11 @@ class TestRealWindow(unittest.TestCase):
 
             press("Reset", "1", ".", "5", "±")         # the two buttons from issue #3
             self.assertEqual(calculator.state.display_label.cget("text"), "-1.5")
+
+            press("Reset", "1", "0", "0", "log")       # and the two from issue #4
+            self.assertEqual(calculator.state.display_label.cget("text"), "2")
+            press("Reset", "5", "0", "%")
+            self.assertEqual(calculator.state.display_label.cget("text"), "0.5")
 
             press("About")            # opens a real Toplevel with real Labels
             press("=")

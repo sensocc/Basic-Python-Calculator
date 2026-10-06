@@ -168,9 +168,9 @@ class KeypadTestCase(unittest.TestCase):
 
 
 class TestLayout(KeypadTestCase):
-    def test_there_are_twenty_three_buttons(self):
-        self.assertEqual(len(Calculator.KEYPAD), 23)
-        self.assertEqual(len(self.buttons), 23)
+    def test_there_are_twenty_five_buttons(self):
+        self.assertEqual(len(Calculator.KEYPAD), 25)
+        self.assertEqual(len(self.buttons), 25)
 
     def test_every_keypad_entry_has_a_button(self):
         for entry in Calculator.KEYPAD:
@@ -185,7 +185,8 @@ class TestLayout(KeypadTestCase):
                                    ("1", 4, 0),
                                    ("0", 5, 0), (".", 5, 1), ("±", 5, 2), ("+", 5, 3),
                                    ("√", 6, 0), ("ln", 6, 2), ("eˣ", 6, 3),
-                                   ("Reset", 7, 0), ("=", 7, 1), ("About", 7, 3)):
+                                   ("log", 7, 0), ("%", 7, 2),
+                                   ("Reset", 8, 0), ("=", 8, 1), ("About", 8, 3)):
             options = self.buttons[label].grid_options
             self.assertEqual((options["row"], options["column"]), (row, column),
                              "button " + label)
@@ -194,7 +195,7 @@ class TestLayout(KeypadTestCase):
         columns = sorted({widget.grid_options["column"] for widget in FakeButton.instances})
         rows = sorted({widget.grid_options["row"] for widget in FakeButton.instances})
         self.assertEqual(columns, [0, 1, 2, 3])
-        self.assertEqual(rows, [2, 3, 4, 5, 6, 7])
+        self.assertEqual(rows, [2, 3, 4, 5, 6, 7, 8])
 
     def test_equals_spans_two_columns(self):
         self.assertEqual(self.buttons["="].grid_options["columnspan"], 2)
@@ -207,7 +208,7 @@ class TestLayout(KeypadTestCase):
         self.assertLess(status["row"], display["row"])
 
     def test_the_window_has_a_title(self):
-        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V5")
+        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V6")
 
 
 class TestTheMaths(unittest.TestCase):
@@ -264,6 +265,16 @@ class TestTheMaths(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertAlmostEqual(Calculator.apply_function("ln", value), expected)
 
+    def test_the_common_logarithm(self):
+        for value, expected in ((1, 0.0), (100, 2.0), (1000, 3.0), (0.1, -1.0), (2, math.log10(2))):
+            with self.subTest(value=value):
+                self.assertAlmostEqual(Calculator.apply_function("log10", value), expected)
+
+    def test_percent(self):
+        for value, expected in ((50, 0.5), (200, 2.0), (3, 0.03), (0, 0.0), (-25, -0.25)):
+            with self.subTest(value=value):
+                self.assertAlmostEqual(Calculator.apply_function("percent", value), expected)
+
     def test_the_exponent_and_the_logarithm_undo_each_other(self):
         for value in (0.5, 2, 99):
             with self.subTest(value=value):
@@ -274,6 +285,8 @@ class TestTheMaths(unittest.TestCase):
         for function, value, complaint in (
             ("ln", 0, "logarithm of a number above zero"),
             ("ln", -1, "logarithm of a number above zero"),
+            ("log10", 0, "logarithm of a number above zero"),
+            ("log10", -1, "logarithm of a number above zero"),
             ("exp", 1000, "exponent is too big"),
             ("exp", float("nan"), "not a number I can show"),
             ("sin", 1, "I do not know the function"),
@@ -286,6 +299,8 @@ class TestTheMaths(unittest.TestCase):
     def test_how_a_function_reads_on_the_status_line(self):
         self.assertEqual(Calculator.write_function("exp", "2"), "e^2")
         self.assertEqual(Calculator.write_function("ln", "2"), "ln(2)")
+        self.assertEqual(Calculator.write_function("log10", "100"), "log(100)")
+        self.assertEqual(Calculator.write_function("percent", "50"), "50%")
 
     def test_a_number_too_big_to_show_is_refused(self):
         with self.assertRaises(ValueError):
@@ -362,8 +377,8 @@ class TestButtons(KeypadTestCase):
         self.assertEqual(about.title_text, "About This App")
         labels = [widget.cget("text") for widget in FakeLabel.instances
                   if widget.master is about]
-        self.assertEqual(labels, ["VER 5.0! Made by Sasha!",
-                                 "Version 5: a decimal point and a ± sign, from issue #3."])
+        self.assertEqual(labels, ["VER 6.0! Made by Sasha!",
+                                 "Version 6: log and percent, from issue #4."])
 
 
 class TestTypingDecimalsAndSigns(KeypadTestCase):
@@ -478,6 +493,39 @@ class TestTheFunctionButtons(KeypadTestCase):
         self.press("ln")
         self.assertEqual(self.display(), "5")
 
+    def test_the_common_logarithm_button(self):
+        self.press("1", "0", "0", "log")
+        self.assertEqual(self.display(), "2")
+        self.assertEqual(self.status(), "log(100) = 2")
+
+    def test_the_percent_button(self):
+        self.press("5", "0", "%")
+        self.assertEqual(self.display(), "0.5")
+        self.assertEqual(self.status(), "50% = 0.5")
+
+    def test_percent_of_an_answer(self):
+        self.press("1", "+", "1", "=")
+        self.assertEqual(self.display(), "2")
+        self.press("%")
+        self.assertEqual(self.display(), "0.02")
+
+    def test_a_logarithm_finishes_a_waiting_calculation(self):
+        self.press("2", "+", "1", "0", "0", "log")
+        self.assertEqual(self.display(), "4")
+        self.assertEqual(self.status(), "2 + log(100) = 4")
+
+    def test_percent_carries_on_into_a_calculation(self):
+        self.press("5", "0", "%", "+", "1", "=")
+        self.assertEqual(self.display(), "1.5")
+
+    def test_the_issue_4_example(self):
+        self.press("1", "0", "0", "log", "+", "1", "=")
+        self.assertEqual(self.display(), "3")
+
+    def test_a_decimal_logarithm(self):
+        self.press("0", ".", "1", "log")
+        self.assertEqual(self.display(), "-1")
+
     def test_a_function_before_a_number(self):
         self.press("eˣ")
         self.assertEqual(self.status(), "Type a number first.")
@@ -524,6 +572,12 @@ class TestBadInput(KeypadTestCase):
 
     def test_the_logarithm_of_zero(self):
         self.assertEqual(self.complain("0", "ln"),
+                         "I can only take the logarithm of a number above zero.")
+        self.assertEqual(self.complain("0", "log"),
+                         "I can only take the logarithm of a number above zero.")
+
+    def test_the_common_logarithm_of_a_negative_number(self):
+        self.assertEqual(self.complain("3", "-", "5", "=", "log"),
                          "I can only take the logarithm of a number above zero.")
 
     def test_the_logarithm_of_a_negative_number(self):
