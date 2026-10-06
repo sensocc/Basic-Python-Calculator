@@ -35,6 +35,11 @@ class TclError(Exception):
     """Stands in for tkinter.TclError."""
 
 
+# Every widget ever made, of whatever kind, so a window can be asked for its
+# children the way Tk would be asked.
+EVERY_WIDGET = []
+
+
 class FakeWidget:
     instances = []
 
@@ -44,7 +49,9 @@ class FakeWidget:
         self.command = options.get("command")
         self.grid_options = {}
         self.pack_options = {}
+        self.destroyed = False
         self.instances.append(self)
+        EVERY_WIDGET.append(self)
 
     def config(self, **options):
         self.options.update(options)
@@ -61,7 +68,15 @@ class FakeWidget:
         self.pack_options = dict(options)
 
     def winfo_exists(self):
-        return True
+        return not self.destroyed
+
+    def winfo_children(self):
+        # destroyed children are gone, exactly as they would be in Tk
+        return [widget for widget in EVERY_WIDGET
+                if widget.master is self and not widget.destroyed]
+
+    def destroy(self):
+        self.destroyed = True
 
     def lift(self):
         pass
@@ -149,16 +164,20 @@ class KeypadTestCase(unittest.TestCase):
     def setUp(self):
         for widget in WIDGETS:
             widget.instances.clear()
+        EVERY_WIDGET.clear()
         Calculator.state.result_window = None
         Calculator.state.result_label = None
+        Calculator.state.history_window = None
         self.root = Calculator.build_window()
         self.buttons = {widget.cget("text"): widget for widget in FakeButton.instances}
         # A new window is not a new calculator: the state has to be cleaned out too,
         # or one test carries a half-finished calculation into the next one.
         self.press("Reset")
         # The switch is a setting, so Reset deliberately leaves it alone - here it has
-        # to be put back by hand, or one test's degrees leak into the next test.
+        # to be put back by hand, or one test's degrees leak into the next test. The
+        # history outlives Reset as well: it is a record, and Clear is what empties it.
         Calculator.state.angle_mode = "deg"
+        Calculator.state.history.clear()
 
     def press(self, *labels):
         for label in labels:
@@ -177,9 +196,9 @@ class KeypadTestCase(unittest.TestCase):
 
 
 class TestLayout(KeypadTestCase):
-    def test_there_are_thirty_three_buttons(self):
-        self.assertEqual(len(Calculator.KEYPAD), 33)
-        self.assertEqual(len(self.buttons), 33)
+    def test_there_are_thirty_four_buttons(self):
+        self.assertEqual(len(Calculator.KEYPAD), 34)
+        self.assertEqual(len(self.buttons), 34)
 
     def test_every_keypad_entry_has_a_button(self):
         for entry in Calculator.KEYPAD:
@@ -196,7 +215,7 @@ class TestLayout(KeypadTestCase):
                                    ("√", 6, 0), ("ln", 6, 2), ("eˣ", 6, 3),
                                    ("log", 7, 0), ("sin", 7, 2), ("cos", 7, 3),
                                    ("tg", 8, 0), ("ctg", 8, 1), ("π", 8, 2), ("e", 8, 3),
-                                   ("⌫", 9, 0), ("DEG", 9, 2),
+                                   ("⌫", 9, 0), ("DEG", 9, 1), ("History", 9, 2),
                                    ("Reset", 10, 0), ("=", 10, 1), ("About", 10, 3)):
             options = self.buttons[label].grid_options
             self.assertEqual((options["row"], options["column"]), (row, column),
@@ -225,7 +244,7 @@ class TestLayout(KeypadTestCase):
         self.assertLess(status["row"], display["row"])
 
     def test_the_window_has_a_title(self):
-        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V9")
+        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V10")
 
 
 class TestTheMaths(unittest.TestCase):
@@ -432,8 +451,8 @@ class TestButtons(KeypadTestCase):
         self.assertEqual(about.title_text, "About This App")
         labels = [widget.cget("text") for widget in FakeLabel.instances
                   if widget.master is about]
-        self.assertEqual(labels, ["VER 9.0! Made by Sasha!",
-                                 "Version 9: the keyboard and ⌫, from issue #7."])
+        self.assertEqual(labels, ["VER 10.0! Made by Sasha!",
+                                 "Version 10: the calculation history, from issue #8."])
 
 
 class TestTypingDecimalsAndSigns(KeypadTestCase):
@@ -510,6 +529,100 @@ class TestTypingDecimalsAndSigns(KeypadTestCase):
     def test_the_sign_button_after_an_operator_with_no_number(self):
         self.press("2", "+", "±")
         self.assertEqual(self.status(), "Type a number first.")
+
+
+class TestTheHistory(KeypadTestCase):
+    """The history window, from issue #8."""
+
+    def texts(self):
+        return [entry.text for entry in Calculator.state.history]
+
+    def children_texts(self):
+        return [widget.cget("text") for widget in Calculator.state.history_window.winfo_children()]
+
+    def test_a_result_is_remembered(self):
+        self.press("1", "2", "+", "5", "=")
+        self.assertEqual(self.texts(), ["12 + 5 = 17"])
+        self.assertEqual(Calculator.state.history[0].value, 17.0)
+
+    def test_a_one_number_function_is_remembered(self):
+        self.press("1", "0", "0", "log")
+        self.assertEqual(self.texts(), ["log(100) = 2"])
+
+    def test_a_function_finishing_a_calculation_is_remembered(self):
+        self.press("2", "+", "3", "ln")
+        self.assertEqual(self.texts(), ["2 + ln(3) = 3.09861228867"])
+
+    def test_a_step_finished_by_a_second_operator_is_remembered(self):
+        self.press("2", "+", "3", "+")
+        self.assertEqual(self.texts()[:1], ["2 + 3 = 5"])
+
+    def test_the_newest_calculation_comes_first(self):
+        self.press("1", "0", "+", "5", "=")
+        self.press("2", "+", "2", "=")
+        self.press("6", "*", "7", "=")
+        self.assertEqual(self.texts(), ["6 * 7 = 42", "2 + 2 = 4", "10 + 5 = 15"])
+
+    def test_a_refused_calculation_is_not_remembered(self):
+        self.press("5", "/", "0", "=")
+        self.press("0", "ln")
+        self.assertEqual(self.texts(), [])
+
+    def test_putting_a_constant_on_show_is_not_a_calculation(self):
+        self.press("π")
+        self.assertEqual(self.texts(), [])
+
+    def test_the_list_is_capped(self):
+        for number in range(1, Calculator.HISTORY_LIMIT + 6):
+            for digit in str(number):
+                self.press(digit)
+            self.press("+", "1", "=")
+        self.assertEqual(len(Calculator.state.history), Calculator.HISTORY_LIMIT)
+        self.assertEqual(self.texts()[0], "25 + 1 = 26")
+        self.assertEqual(self.texts()[-1], "6 + 1 = 7")
+
+    def test_reset_does_not_empty_the_history(self):
+        self.press("1", "+", "1", "=")
+        self.fresh()
+        self.assertEqual(self.texts(), ["1 + 1 = 2"])
+
+    def test_the_window_opens_and_lists_what_has_been_worked_out(self):
+        self.press("1", "+", "1", "=")
+        self.press("History")
+        self.assertEqual(Calculator.state.history_window.title_text, "The Calculation History!")
+        self.assertEqual(self.children_texts(), ["1. 1 + 1 = 2", "Clear"])
+
+    def test_an_empty_history_says_so(self):
+        self.press("History")
+        self.assertEqual(self.children_texts(),
+                         ["Nothing has been worked out yet.", "Clear"])
+
+    def test_picking_an_entry_brings_its_answer_back(self):
+        self.press("1", "0", "+", "5", "=")
+        self.fresh()
+        self.press("History")
+        entry = [widget for widget in Calculator.state.history_window.winfo_children()
+                 if widget.cget("text") == "1. 10 + 5 = 15"][0]
+        entry.command()
+        self.assertEqual(self.display(), "15")
+        self.press("*", "2", "=")
+        self.assertEqual(self.display(), "30")
+
+    def test_the_window_is_reused_rather_than_stacked(self):
+        self.press("History")
+        first = Calculator.state.history_window
+        self.press("Reset", "1", "+", "1", "=", "History")
+        self.assertIs(Calculator.state.history_window, first)
+        self.assertEqual(self.children_texts(), ["1. 1 + 1 = 2", "Clear"])
+
+    def test_clear_empties_the_list_and_the_window(self):
+        self.press("1", "+", "1", "=", "History")
+        clear = [widget for widget in Calculator.state.history_window.winfo_children()
+                 if widget.cget("text") == "Clear"][0]
+        clear.command()
+        self.assertEqual(Calculator.state.history, [])
+        self.assertEqual(self.children_texts(),
+                         ["Nothing has been worked out yet.", "Clear"])
 
 
 class TestTheBackspaceButton(KeypadTestCase):

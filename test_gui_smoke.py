@@ -85,7 +85,7 @@ class TestRealWindow(unittest.TestCase):
             buttons = {widget.cget("text"): widget
                        for widget in root.winfo_children()
                        if isinstance(widget, real_button)}
-            self.assertEqual(len(buttons), 33, "the keypad is not complete")
+            self.assertEqual(len(buttons), 34, "the keypad is not complete")
 
             def press(*labels):
                 for label in labels:
@@ -133,6 +133,21 @@ class TestRealWindow(unittest.TestCase):
 
             press("Reset", "1", "2", "3", "⌫")        # the backspace from issue #7
             self.assertEqual(calculator.state.display_label.cget("text"), "12")
+
+            press("Reset", "1", "0", "+", "5", "=")    # the history from issue #8
+            press("History")
+            history = calculator.state.history_window
+            self.assertEqual(history.title(), "The Calculation History!")
+            listed = [widget.cget("text") for widget in history.winfo_children()
+                      if isinstance(widget, real_button)]
+            self.assertEqual(listed[0], "1. 10 + 5 = 15")   # newest first
+            self.assertEqual(listed[-1], "Clear")           # everything else filed above it
+
+            listed_widgets = [widget for widget in history.winfo_children()
+                              if isinstance(widget, real_button)]
+            listed_widgets[0].invoke()                 # pick the answer back up
+            self.assertEqual(calculator.state.display_label.cget("text"), "15")
+            history.destroy()
 
             press("About")            # opens a real Toplevel with real Labels
             press("=")
