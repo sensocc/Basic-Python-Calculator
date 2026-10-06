@@ -16,6 +16,7 @@ can be imported and driven without Tk.
 import importlib.util
 import math
 import subprocess
+import types
 import sys
 import types
 import unittest
@@ -70,9 +71,14 @@ class FakeTk(FakeWidget):
     def __init__(self, *args, **options):
         super().__init__(None, **options)
         self.title_text = None
+        self.bindings = {}
 
     def title(self, text):
         self.title_text = text
+
+    def bind(self, sequence, handler):
+        """Remember it, so a test can prove the window wired the keyboard up."""
+        self.bindings[sequence] = handler
 
     def columnconfigure(self, *args, **options):
         pass
@@ -171,9 +177,9 @@ class KeypadTestCase(unittest.TestCase):
 
 
 class TestLayout(KeypadTestCase):
-    def test_there_are_thirty_two_buttons(self):
-        self.assertEqual(len(Calculator.KEYPAD), 32)
-        self.assertEqual(len(self.buttons), 32)
+    def test_there_are_thirty_three_buttons(self):
+        self.assertEqual(len(Calculator.KEYPAD), 33)
+        self.assertEqual(len(self.buttons), 33)
 
     def test_every_keypad_entry_has_a_button(self):
         for entry in Calculator.KEYPAD:
@@ -190,7 +196,8 @@ class TestLayout(KeypadTestCase):
                                    ("√", 6, 0), ("ln", 6, 2), ("eˣ", 6, 3),
                                    ("log", 7, 0), ("sin", 7, 2), ("cos", 7, 3),
                                    ("tg", 8, 0), ("ctg", 8, 1), ("π", 8, 2), ("e", 8, 3),
-                                   ("DEG", 9, 0), ("=", 9, 2), ("About", 9, 3)):
+                                   ("⌫", 9, 0), ("DEG", 9, 2),
+                                   ("Reset", 10, 0), ("=", 10, 1), ("About", 10, 3)):
             options = self.buttons[label].grid_options
             self.assertEqual((options["row"], options["column"]), (row, column),
                              "button " + label)
@@ -199,13 +206,16 @@ class TestLayout(KeypadTestCase):
         columns = sorted({widget.grid_options["column"] for widget in FakeButton.instances})
         rows = sorted({widget.grid_options["row"] for widget in FakeButton.instances})
         self.assertEqual(columns, [0, 1, 2, 3])
-        self.assertEqual(rows, [2, 3, 4, 5, 6, 7, 8, 9])
+        self.assertEqual(rows, [2, 3, 4, 5, 6, 7, 8, 9, 10])
 
     def test_the_bottom_row_holds_the_whole_window_controls(self):
-        for label, column in (("DEG", 0), ("Reset", 1), ("=", 2), ("About", 3)):
+        for label, column in (("Reset", 0), ("=", 1), ("About", 3)):
             with self.subTest(button=label):
                 options = self.buttons[label].grid_options
-                self.assertEqual((options["row"], options["column"]), (9, column))
+                self.assertEqual((options["row"], options["column"]), (10, column))
+
+    def test_equals_is_a_wide_button_again(self):
+        self.assertEqual(self.buttons["="].grid_options["columnspan"], 2)
 
     def test_the_status_line_sits_above_the_number(self):
         status = Calculator.state.status_label.grid_options
@@ -215,7 +225,7 @@ class TestLayout(KeypadTestCase):
         self.assertLess(status["row"], display["row"])
 
     def test_the_window_has_a_title(self):
-        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V8")
+        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V9")
 
 
 class TestTheMaths(unittest.TestCase):
@@ -422,8 +432,8 @@ class TestButtons(KeypadTestCase):
         self.assertEqual(about.title_text, "About This App")
         labels = [widget.cget("text") for widget in FakeLabel.instances
                   if widget.master is about]
-        self.assertEqual(labels, ["VER 8.0! Made by Sasha!",
-                                 "Version 8: the constants π and e, from issue #6."])
+        self.assertEqual(labels, ["VER 9.0! Made by Sasha!",
+                                 "Version 9: the keyboard and ⌫, from issue #7."])
 
 
 class TestTypingDecimalsAndSigns(KeypadTestCase):
@@ -500,6 +510,127 @@ class TestTypingDecimalsAndSigns(KeypadTestCase):
     def test_the_sign_button_after_an_operator_with_no_number(self):
         self.press("2", "+", "±")
         self.assertEqual(self.status(), "Type a number first.")
+
+
+class TestTheBackspaceButton(KeypadTestCase):
+    """⌫, the Small half of issue #7."""
+
+    def test_it_takes_the_last_character_off(self):
+        self.press("1", "2", "3", "⌫")
+        self.assertEqual(self.display(), "12")
+
+    def test_it_can_empty_the_number_being_typed(self):
+        self.press("7", "⌫")
+        self.assertEqual(self.display(), "0")
+        self.assertEqual(Calculator.state.entry, "")
+
+    def test_it_takes_a_decimal_point_off(self):
+        self.press("1", ".", "⌫")
+        self.assertEqual(self.display(), "1")
+
+    def test_it_never_leaves_a_lone_minus_sign(self):
+        self.press("5", "±", "⌫")
+        self.assertEqual(Calculator.state.entry, "")
+        self.press("+")                      # and the operator does not blow up
+        self.assertEqual(self.status(), "Type a number first.")
+
+    def test_it_leaves_a_waiting_calculation_alone(self):
+        self.press("2", "+", "1", "⌫")
+        self.assertEqual(self.display(), "2")
+        self.assertEqual(self.status(), "2 +")
+
+    def test_with_nothing_typed_it_clears_the_message(self):
+        self.press("1", "+", "1", "=")
+        self.assertEqual(self.status(), "1 + 1 = 2")
+        self.press("⌫")
+        self.assertEqual(self.status(), "")
+        self.assertEqual(self.display(), "2")        # the answer is left alone
+
+    def test_it_clears_a_refusal(self):
+        self.press("5", "/", "0", "=")
+        self.assertEqual(self.status(), "You cannot divide by zero.")
+        self.press("⌫")
+        self.assertEqual(self.status(), "")
+
+
+class TestTheKeyboard(KeypadTestCase):
+    """The Middle half of issue #7: the keys do what the buttons do."""
+
+    def press_key(self, keysym, char=""):
+        """A key press as Tk would deliver it."""
+        return Calculator.on_key(types.SimpleNamespace(keysym=keysym, char=char))
+
+    def test_the_map_holds_the_keys_the_issue_asks_for(self):
+        keys = Calculator.state.keys
+        for name in list("0123456789") + list("+-*/^") + [".", "%", "=", "Return",
+                                                         "Escape", "BackSpace"]:
+            with self.subTest(key=name):
+                self.assertIn(name, keys)
+        for name in ("KP_7", "KP_Decimal", "KP_Add", "KP_Enter"):
+            with self.subTest(key=name):
+                self.assertIn(name, keys)
+
+    def test_typing_numbers_and_operators(self):
+        for key in "1", "2", "+", "5":
+            self.press_key(key, key)
+        self.assertEqual(self.display(), "5")
+        self.assertEqual(self.status(), "12 +")
+        self.press_key("Return")
+        self.assertEqual(self.display(), "17")
+
+    def test_enter_and_equals_are_the_same_key(self):
+        self.press_key("1", "1")
+        self.press_key("+", "+")
+        self.press_key("2", "2")
+        self.press_key("=", "=")
+        self.assertEqual(self.display(), "3")
+        self.press_key("Escape")
+        self.assertEqual(self.display(), "0")
+
+    def test_the_star_key_is_named_asterisk_by_tk(self):
+        self.press_key("2", "2")
+        self.press_key("asterisk", "*")           # Tk's name for the * key
+        self.press_key("3", "3")
+        self.press_key("equal", "=")
+        self.assertEqual(self.display(), "6")
+
+    def test_the_keyboard_can_type_a_decimal_point_and_a_percent(self):
+        self.press_key("period", ".")
+        self.press_key("5", "5")
+        self.assertEqual(self.display(), "0.5")
+        self.press_key("percent", "%")
+        self.assertEqual(self.display(), "0.005")
+
+    def test_the_numeric_keypad_works(self):
+        self.press_key("KP_7")
+        self.press_key("KP_Add")
+        self.press_key("KP_3")
+        self.press_key("KP_Enter")
+        self.assertEqual(self.display(), "10")
+
+    def test_backspace_is_the_backspace_button(self):
+        self.press_key("1", "1")
+        self.press_key("2", "2")
+        self.press_key("BackSpace")
+        self.assertEqual(self.display(), "1")
+
+    def test_a_key_that_is_not_wired_up_does_nothing(self):
+        self.press_key("4", "4")
+        for keysym, char in (("F5", ""), ("z", "z"), ("space", " "), ("Up", "")):
+            with self.subTest(keysym=keysym):
+                self.assertIsNone(self.press_key(keysym, char))
+                self.assertEqual(self.display(), "4")
+
+    def test_the_window_binds_the_keyboard(self):
+        self.assertIn("<Key>", self.root.bindings)
+        event = types.SimpleNamespace(keysym="7", char="7")
+        self.assertEqual(self.root.bindings["<Key>"](event), "break")
+        self.assertEqual(self.display(), "7")
+
+    def test_a_handled_key_stops_tk_from_handling_it_twice(self):
+        # returning "break" keeps a focused button from acting on the same key
+        self.assertEqual(self.press_key("5", "5"), "break")
+        self.assertIsNone(self.press_key("z", "z"))
 
 
 class TestTheConstantButtons(KeypadTestCase):

@@ -1,4 +1,4 @@
-# Basic Python Calculator — version 8
+# Basic Python Calculator — version 9
 
 [![Tests](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml)
 
@@ -6,14 +6,15 @@ A small desktop calculator written in Python with [Tkinter](https://docs.python.
 Type the first number, pick an operator, type the second number, press `=` — the answer appears in the main
 window and in a small popup. The numbers can be decimals, and the `±` button makes them negative. There are
 one-number buttons for `eˣ`, `ln`, `log`, `%`, and for the trigonometry `sin`, `cos`, `tg` and `ctg` — those
-four with a `DEG` / `RAD` switch — plus the two constants `π` and `e`. Made by Sasha.
+four with a `DEG` / `RAD` switch — plus the two constants `π` and `e`. Everything can be done from the
+keyboard as well. Made by Sasha.
 
-**This is version 8**, the newest one, tagged `v8.0`: the `π` and `e` buttons that [issue #6][issue] asked
-for, on top of the tests and the workflow that keep the calculator working.
+**This is version 9**, the newest one, tagged `v9.0`: the keyboard and the `⌫` button that [issue #7][issue]
+asked for, on top of the tests and the workflow that keep the calculator working.
 
-[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/6
+[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/7
 
-## The eight versions
+## The nine versions
 
 This repository keeps every version of the calculator as a version of **one file** — `Calculator.py`, each
 with its own `README.md` — instead of several files sitting side by side:
@@ -27,7 +28,8 @@ with its own `README.md` — instead of several files sitting side by side:
 | `v5.0` | Type decimals and negatives: a `.` and a `±` beside the digits. | `git checkout v5.0` |
 | `v6.0` | Adds `log` (base 10) and `%` (divide by 100). | `git checkout v6.0` |
 | `v7.0` | Adds `sin`, `cos`, `tg` and `ctg`, and the `DEG` / `RAD` switch they obey. | `git checkout v7.0` |
-| `v8.0` | **This version.** Adds the constants `π` and `e`. | `git checkout v8.0` |
+| `v8.0` | Adds the constants `π` and `e`. | `git checkout v8.0` |
+| `v9.0` | **This version.** Adds keyboard input and the `⌫` button. | `git checkout v9.0` |
 
 Every tag is also a GitHub Release, so any version can be downloaded as a zip without using git.
 
@@ -87,9 +89,11 @@ This calculator needs Python's tkinter toolkit, and Tk is not installed.
   │log │ %  │sin │cos │
   ├────┼────┼────┼────┤
   │ tg │ctg │ π  │ e  │
-  ├────┼────┼────┼────┤
-  │DEG │Reset│ =  │About│
-  └────┴────┴────┴────┘
+  ├────┼────┼────┴────┤
+  │  ⌫      │   DEG   │
+  ├────┼────┴────┬────┤
+  │Reset│   =    │About│
+  └─────┴────────┴─────┘
 ```
 
 1. Press the digits of the first number. Decimals and negatives are typed the same way: `.` starts `0.` and
@@ -114,6 +118,24 @@ Two kinds of button are the exceptions to "number first":
   `4.14159265359`, and a digit typed afterwards starts a fresh number rather than adding to the digits of π.
   If a calculation is waiting, the constant is its last number: `2 + π` shows `2 + π = 5.14159265359` there
   and then.
+
+### Typing without the mouse
+
+The keyboard does what the buttons do, so `1` `2` `+` `5` and Enter gives `17` without touching the mouse:
+
+| Key | What it does |
+|-----|--------------|
+| `0` to `9` (and the numeric keypad) | the digits |
+| `.` | decimal point |
+| `+` `-` `*` `/` `^` | the operators, the same as the buttons |
+| `%` | percent |
+| `=` or `Enter` | the answer, exactly as the `=` button |
+| `Esc` | `Reset` |
+| `Backspace` | the `⌫` button: one character off the number being typed |
+
+A key that is not in that table does nothing at all — no beeps, no surprises. The window has to be the
+focused one, and the letter-named buttons (`ln`, `log`, `sin`, `cos`, `tg`, `ctg`, `π`, `e`, `±`, `DEG`) are
+mouse-only for now.
 
 ### Angles: the DEG / RAD switch
 
@@ -145,6 +167,7 @@ sum you are working on.
 | `e` | 2.718281828459045, put straight on show | `e + 1 =` → `3.71828182846` |
 | `.` | decimal point — one per number | `1 . 5` → `1.5`, `.` on its own → `0.` |
 | `±` | flips the sign of the number on show | `5 ±` → `-5`, `3 - 5 = ±` → `2` |
+| `⌫` | takes one character off the number being typed | `1 2 3 ⌫` → `12` |
 
 `eˣ` and `ln` undo each other, so `5 eˣ ln` gives `5` back — and `e ln` is `1`, since the natural logarithm of
 `e` is what it was built on.
@@ -170,25 +193,29 @@ Bad input gets a sentence in the status line rather than a red traceback in the 
 comes out infinite or too large for a float; those are hard to reach by clicking, so they are covered by
 tests rather than by a button sequence.
 
-## What changed in version 8
+## What changed in version 9
 
-* **Two constants.** `π` and `e` put 3.141592653589793 and 2.718281828459045 straight on show, so you stop
-  typing 16 digits by hand. They live in a small `CONSTANTS` table, one entry each.
-* **They behave like an answer, not like a typed number.** A constant replaces whatever is on show, and a
-  digit typed afterwards starts a fresh number instead of being added to the end of π. That is the same rule
-  the one-number buttons already obey, so it needed no new state at all.
-* **A waiting calculation is finished with the constant** as its last number: `2 + π` reads
-  `2 + π = 5.14159265359`. That path is now shared: `press_function()` and `press_constant()` both end with
-  one `finish_with(value, written)` helper, which took a duplicate block out of `press_function()`.
-* **In the layout:** the constants join the last function row (`tg ctg π e`), and the bottom row became the
-  whole-window controls — `DEG Reset = About`. That cost `=` its two-column width, and bought back the row
-  that two more buttons would otherwise have needed, so the window is the same height as version 7.
-* **In the tests:** 10 new ones — both constants, the issue's example (`π * 2 =` → `6.28318530718`), a digit
-  and a decimal point starting fresh afterwards, a constant replacing a half-typed number, `2 + π`, `e ln`
-  being `1`, and `±` flipping π.
+* **The keyboard works.** Digits, `.`, `+ - * / ^ %`, `=` or Enter, Escape and Backspace — and the numeric
+  keypad too. `1 2 + 5 Enter` gives `17` without touching the mouse.
+* **One map, no second copy of the logic.** `build_key_map()` points every key at the handler the matching
+  button already calls. Both the character a key types and the name Tk gives it are in the map, because Tk
+  calls the `*` key `asterisk` and the Enter key `Return`; a key that is not in the map does nothing.
+* **A key is handled once.** The binding returns `"break"`, which stops Tk from passing the same key on to a
+  button that happens to have the focus — without it, Enter would count twice.
+* **`⌫` on the keypad.** It takes one character off the number being typed (`1 2 3 ⌫` → `12`), never leaves a
+  number that is only a minus sign, and with nothing being typed it tidies the message line away instead of
+  doing nothing at all.
+* **The wide `=` is back.** `⌫` and `DEG` share a new row above the bottom one, so `Reset = About` is laid out
+  as it was in version 7.
+* **In the tests:** 18 new ones. The headless half checks the map and drives the keys through both `on_key()`
+  and the binding the window actually registers; the real-window half types with `event_generate()` — which
+  only works on a **mapped, focused** window. A withdrawn window receives nothing at all, silently, and that
+  is exactly the failure the issue warned about.
 
 ### Earlier versions
 
+* **Version 8** — the constants `π` and `e`, plus the `finish_with()` helper they share with the function
+  buttons.
 * **Version 7** — `sin`, `cos`, `tg` and `ctg`, with the `DEG` / `RAD` switch, and the two traps that came
   with them (no tangent at 90°, and `cos 90°` showing as `0` rather than `6.1e-17`).
 * **Version 6** — `log` (base 10) and `%`, plus the `logarithm()` helper those two buttons share.
@@ -209,8 +236,8 @@ install:
 
 | File | What it checks | Needs |
 |------|----------------|-------|
-| `test_calculator.py` | the maths, every operator, the one-number and angle functions, the constants, typing decimals and signs, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
-| `test_gui_smoke.py` | the same buttons on a **real** Tk window — real widgets, real clicks, no errors inside Tk — and then starts `Calculator.py` to see that its window stays open. | tkinter, the Tcl/Tk libraries and a display; it skips itself when one of those is missing |
+| `test_calculator.py` | the maths, every operator, the one-number and angle functions, the constants, typing decimals and signs, the key map, the backspace, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
+| `test_gui_smoke.py` | the same buttons on a **real** Tk window, real clicks and **real key events** — no errors inside Tk — and then starts `Calculator.py` to see that its window stays open. | tkinter, the Tcl/Tk libraries and a display; it skips itself when one of those is missing |
 
 Run them:
 
@@ -228,6 +255,10 @@ Every push and pull request runs them in
 
 ## Known limits
 
+* The keyboard only covers the keys that mean something on a keypad: the letter-named buttons (`ln`, `log`,
+  `sin`, `cos`, `tg`, `ctg`, `π`, `e`, `±`, `DEG`) have no shortcuts yet.
+* Keys are only seen by the focused window, and the window has to be mapped — a minimised or hidden one gets
+  nothing.
 * `π` and `e` cannot be edited digit by digit: pressing one replaces what is on show, and a digit afterwards
   starts a new number. Type over the digits by typing a fresh number instead.
 * `e` is the constant and `eˣ` is the exponent — neighbours on the keypad, and easy to mix up.
@@ -243,7 +274,5 @@ Every push and pull request runs them in
 * The result popup belongs to `=`; the one-number buttons answer in the big display and the status line.
 * Numbers are shown rounded to 12 significant digits, so very long results are shortened; very large or very
   small ones come out in scientific notation, e.g. `1e+20`.
-* No history and no keyboard shortcuts yet — those are the next ideas, in
-  [#8](https://github.com/sensocc/Basic-Python-Calculator/issues/8) and
-  [#7](https://github.com/sensocc/Basic-Python-Calculator/issues/7), along with
-  [#9](https://github.com/sensocc/Basic-Python-Calculator/issues/9) the interface overhaul.
+* No calculation history yet — that is [issue #8](https://github.com/sensocc/Basic-Python-Calculator/issues/8),
+  and the interface overhaul is [issue #9](https://github.com/sensocc/Basic-Python-Calculator/issues/9).
