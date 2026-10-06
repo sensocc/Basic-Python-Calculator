@@ -1,14 +1,14 @@
-"""A small Tkinter calculator - version 4.
+"""A small Tkinter calculator - version 5.
 
-Version 4 adds the two one-number buttons asked for in issue #1:
+Version 5 adds the two buttons asked for in issue #3, so numbers no longer have
+to be whole and positive:
 
-* `eˣ` - the natural exponent: e (about 2.71828) to the power of the number
-* `ln` - the natural logarithm: the power you raise e to, to get the number
+* `.` - a decimal point, so `12.5`, `0.5` and a careless `12.` can be typed
+* `±` - flips the sign of the number on show, so `5 ±` is `-5`
 
-They work on one number at a time, the way the rest of the keypad does: type
-the number, press the button, and the answer appears straight away. Pressing
-`ln` on a number that is already on show also works, so you can feed an answer
-into the next step.
+They work the way the rest of the keypad does: the digits and the decimal point
+build the number being typed, and the sign can be flipped at any point. An
+answer that is on show can be flipped too, so `3 - 5 =` then `±` shows `2`.
 
 Run it with:
 
@@ -40,8 +40,8 @@ KEYPAD = (
     ("7", 2, 0, 1), ("8", 2, 1, 1), ("9", 2, 2, 1), ("/", 2, 3, 1),
     ("4", 3, 0, 1), ("5", 3, 1, 1), ("6", 3, 2, 1), ("*", 3, 3, 1),
     ("1", 4, 0, 1), ("2", 4, 1, 1), ("3", 4, 2, 1), ("-", 4, 3, 1),
-    ("0", 5, 0, 1), ("√", 5, 1, 1), ("^", 5, 2, 1), ("+", 5, 3, 1),
-    ("ln", 6, 0, 2), ("eˣ", 6, 2, 2),
+    ("0", 5, 0, 1), (".", 5, 1, 1), ("±", 5, 2, 1), ("+", 5, 3, 1),
+    ("√", 6, 0, 1), ("^", 6, 1, 1), ("ln", 6, 2, 1), ("eˣ", 6, 3, 1),
     ("Reset", 7, 0, 1), ("=", 7, 1, 2), ("About", 7, 3, 1),
 )
 
@@ -65,9 +65,12 @@ state = SimpleNamespace(
 def format_number(value):
     """Show a number without a pile of floating point noise."""
     try:
-        return f"{float(value):.12g}"
+        number = float(value)
     except (TypeError, ValueError, OverflowError):
         raise ValueError("That number is too big to show.") from None
+    if number == 0:
+        return "0"          # -0.0 is just 0, and "-0" looks like a mistake
+    return f"{number:.12g}"
 
 
 def to_number(text):
@@ -184,14 +187,59 @@ def add_button(text, command, row, column, columnspan):
 
 # --- what the buttons do -----------------------------------------------------
 
+def begin_a_new_number_if_needed():
+    """The rule the digits and the decimal point share.
+
+    Nothing is half finished, so this is a brand new number rather than the one
+    that is on show.
+    """
+    if state.operator is None and not state.entry:
+        state.first = None
+        state.status = ""
+
+
 def press_digit(digit):
     """Add a digit to the number being typed."""
     state.error = None
-    if state.operator is None and not state.entry:
-        # Nothing is half finished, so this is a brand new calculation.
-        state.first = None
-        state.status = ""
+    begin_a_new_number_if_needed()
     state.entry += str(digit)
+    update_display()
+
+
+def press_decimal_point():
+    """Start or carry on a decimal number: 0.5, 12., 1.25."""
+    state.error = None
+    begin_a_new_number_if_needed()
+    if not state.entry:
+        state.entry = "0."
+    elif "." not in state.entry:
+        state.entry += "."
+    update_display()
+
+
+def press_sign():
+    """Flip the sign of the number on show."""
+    state.error = None
+
+    if state.entry:
+        if state.entry.startswith("-"):
+            state.entry = state.entry[1:]
+        else:
+            state.entry = "-" + state.entry
+        if state.entry.startswith("-") and not state.entry[1:].strip("0."):
+            # -0 and -0. are just 0 and 0.
+            state.entry = state.entry[1:]
+        update_display()
+        return
+
+    if state.operator is None and state.first is not None:
+        before = format_number(state.first)
+        state.first = -state.first
+        state.status = f"-({before}) = {format_number(state.first)}"
+        update_display()
+        return
+
+    state.error = "Type a number first."
     update_display()
 
 
@@ -347,7 +395,7 @@ def open_about_window():
     window.configure(bg=BACKGROUND)
     tk.Label(
         window,
-        text="VER 4.0! Made by Sasha!",
+        text="VER 5.0! Made by Sasha!",
         padx=20,
         pady=20,
         font=FONT,
@@ -356,7 +404,7 @@ def open_about_window():
     ).pack()
     tk.Label(
         window,
-        text="Version 4: eˣ and ln, from issue #1.",
+        text="Version 5: a decimal point and a ± sign, from issue #3.",
         padx=20,
         font=SMALL_FONT,
         bg=BACKGROUND,
@@ -369,7 +417,7 @@ def open_about_window():
 def build_window():
     """Create the calculator window and remember its widgets on state."""
     root = tk.Tk()
-    root.title("My Fancy-Shmancy Calculator V4")
+    root.title("My Fancy-Shmancy Calculator V5")
     root.configure(bg=BACKGROUND)
     state.root = root
 
@@ -390,6 +438,10 @@ def build_window():
             command = lambda name=FUNCTIONS[label]: press_function(name)
         elif label == "=":
             command = press_equals
+        elif label == ".":
+            command = press_decimal_point
+        elif label == "±":
+            command = press_sign
         elif label == "Reset":
             command = press_reset
         elif label == "About":
