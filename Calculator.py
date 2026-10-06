@@ -1,43 +1,24 @@
-"""A small Tkinter calculator - version 10.
+"""A small Tkinter calculator - version 11.
 
-Version 10 adds the history asked for in issue #8: every finished calculation
-is remembered, newest first, and the History button opens them in their own
-window. Picking an entry puts its answer back on show, ready to carry on from,
-and Clear empties the list. The list is kept in memory only, so it lasts as
-long as the window is open, and the oldest entries drop off at HISTORY_LIMIT.
+Version 11 is the interface overhaul asked for in issue #9:
 
-Version 9 added the keyboard and the backspace key asked for in issue #7:
+* five colour themes, in a Theme menu and on a Theme button: Terminal (the old
+  black and green), Light, Dark, Solarized Light and Solarized Dark
+* every window follows the theme, including the About, result and history
+  windows that happen to be open at the time
+* a bigger number, roomier buttons that light up under the pointer, and a font
+  chosen from the ones this machine actually has rather than assuming Arial,
+  which is not installed everywhere
 
-* the keyboard types what the buttons do: the digits, `.`, `+ - * / ^ %`, `=` or
-  Enter for the answer, Escape for Reset, and Backspace to take a character off
-* `⌫` on the keypad does the same thing as the Backspace key
-
-The keys are wired to the same handlers the buttons use, so there is no second
-copy of the logic to keep in step, and a key that is not in the map does
-nothing at all.
-
-Version 8 added the two constants asked for in issue #6:
-
-* `π` - 3.141592653589793
-* `e` - 2.718281828459045
-
-They behave like an answer rather than a typed number: they take the place of
-whatever is on show, they finish a calculation that is waiting (`2 + π` is
-5.14159265359), and typing a digit afterwards starts a fresh number.
-
-Version 7 added the trigonometry asked for in issue #5:
-
-* `sin`, `cos`, `tg` and `ctg` - type an angle, press the button
-* a `DEG` / `RAD` switch, because an angle means nothing without its unit
-
-Degrees are the default, so `sin 30` is `0.5`. The switch changes its own label,
-and the answer says which unit made it: `sin(30°) = 0.5`, `sin(0.5 rad) = 0.479425538604`.
+Versions 1 to 10 built the calculator itself: one keypad, guarded arithmetic
+that says what went wrong, a decimal point and a sign, eˣ / ln / log / percent,
+the trigonometry with its DEG/RAD switch, the constants π and e, the keyboard,
+and a history of what has been worked out.
 
 Run it with:
 
     python3 Calculator.py
 """
-
 import math
 import sys
 from collections import namedtuple
@@ -45,14 +26,77 @@ from types import SimpleNamespace
 
 try:
     import tkinter as tk
+    import tkinter.font as tkfont
 except (ImportError, OSError) as error:  # tkinter, or the Tk libraries it needs, is missing
     tk = None
+    tkfont = None
     TKINTER_ERROR = error
 
-BACKGROUND = "black"
-FOREGROUND = "SpringGreen2"
-FONT = ("Arial", 18)
-SMALL_FONT = ("Arial", 12)
+# Every theme is a set of colours for the parts of a window. "Terminal" is the
+# look the calculator had before version 11; the two Solarized pairs are that
+# well known palette, which is built to sit easy on the eyes.
+THEMES = {
+    "Terminal": {
+        "window": "black",
+        "display": "black",
+        "text": "SpringGreen2",
+        "status": "SpringGreen2",
+        "button": "black",
+        "button_text": "SpringGreen2",
+        "button_active": "#123a1c",
+    },
+    "Light": {
+        "window": "#f2f3f5",
+        "display": "#ffffff",
+        "text": "#1b1f24",
+        "status": "#5b6470",
+        "button": "#e4e7eb",
+        "button_text": "#1b1f24",
+        "button_active": "#cbd2da",
+    },
+    "Dark": {
+        "window": "#22242a",
+        "display": "#191b20",
+        "text": "#9ee6b4",
+        "status": "#8b93a1",
+        "button": "#2c2f36",
+        "button_text": "#d7dae0",
+        "button_active": "#3d424c",
+    },
+    "Solarized Light": {
+        "window": "#fdf6e3",
+        "display": "#eee8d5",
+        "text": "#268bd2",
+        "status": "#657b83",
+        "button": "#eee8d5",
+        "button_text": "#586e75",
+        "button_active": "#93a1a1",
+    },
+    "Solarized Dark": {
+        "window": "#002b36",
+        "display": "#073642",
+        "text": "#2aa198",
+        "status": "#93a1a1",
+        "button": "#073642",
+        "button_text": "#93a1a1",
+        "button_active": "#586e75",
+    },
+}
+
+THEME_NAMES = tuple(THEMES)
+
+# Families that exist on one machine or another. The first of these that this
+# machine has is used, and Tk's own default font is the last resort - it is
+# always there.
+FONT_CANDIDATES = ("DejaVu Sans", "Liberation Sans", "Noto Sans", "Segoe UI",
+                   "Helvetica Neue", "Arial")
+
+# The characters on the keypad that a font might not have.
+ODD_CHARACTERS = "√⌫±÷π°eˣ"
+
+LABEL_SIZE = 18     # the buttons
+NUMBER_SIZE = 30    # the number being typed
+SMALL_SIZE = 12     # the small line above it, and the little windows
 
 OPERATORS = ("/", "*", "-", "+", "√", "^")
 
@@ -93,7 +137,7 @@ KEYPAD = (
     ("√", 6, 0, 1), ("^", 6, 1, 1), ("ln", 6, 2, 1), ("eˣ", 6, 3, 1),
     ("log", 7, 0, 1), ("%", 7, 1, 1), ("sin", 7, 2, 1), ("cos", 7, 3, 1),
     ("tg", 8, 0, 1), ("ctg", 8, 1, 1), ("π", 8, 2, 1), ("e", 8, 3, 1),
-    ("⌫", 9, 0, 1), ("DEG", 9, 1, 1), ("History", 9, 2, 2),
+    ("⌫", 9, 0, 1), ("DEG", 9, 1, 1), ("History", 9, 2, 1), ("Theme", 9, 3, 1),
     ("Reset", 10, 0, 1), ("=", 10, 1, 2), ("About", 10, 3, 1),
 )
 
@@ -102,6 +146,14 @@ state = SimpleNamespace(
     root=None,
     display_label=None,
     status_label=None,
+    theme="Terminal",    # which of THEMES is on
+    themed=[],           # every widget painted from the theme, so a change can repaint it
+    font_family=None,    # the three fonts, chosen when the window is built
+    font=None,
+    small_font=None,
+    number_font=None,
+    theme_var=None,      # the tick in the Theme menu
+    theme_button=None,   # the button that steps to the next theme
     angle_button=None,   # the DEG/RAD switch, so its label can change
     result_window=None,
     result_label=None,
@@ -266,6 +318,61 @@ def write_function(function, text, angle_mode="deg"):
 
 # --- drawing -----------------------------------------------------------------
 
+def theme_colour(part):
+    """The colour the chosen theme uses for one part of a window."""
+    return THEMES[state.theme][part]
+
+
+def paint(widget, parts):
+    """Give one widget the theme's colours for the parts of it that matter."""
+    widget.configure(**{option: theme_colour(part) for option, part in parts.items()})
+
+
+def colour_widget(widget, **parts):
+    """Colour a widget from the theme and remember how, for the next theme change.
+
+    Every themed widget goes on one list, which is what makes switching theme
+    able to repaint the lot - including windows that are already open.
+    """
+    state.themed.append((widget, parts))
+    paint(widget, parts)
+    return widget
+
+
+def apply_theme():
+    """Repaint everything on screen, and forget the windows that have closed."""
+    still_open = []
+    for widget, parts in state.themed:
+        if not widget.winfo_exists():
+            continue
+        paint(widget, parts)
+        still_open.append((widget, parts))
+    state.themed = still_open
+
+
+def can_draw(family, size=LABEL_SIZE):
+    """Whether a font family has the odd characters the keypad needs."""
+    font = tkfont.Font(family=family, size=size)
+    return all(font.measure(character) for character in set(ODD_CHARACTERS))
+
+
+def choose_font_family():
+    """Pick a font this machine has, rather than one it is only hoped to have.
+
+    Arial, for instance, is not installed everywhere - it is not on this machine -
+    and Tk quietly substitutes something else when a family is missing. So the
+    family is chosen from what is here and then checked against the characters on
+    the keypad, falling back to Tk's own default font if nothing else will do.
+    """
+    families = set(tkfont.families())
+    default_family = tkfont.nametofont("TkDefaultFont").actual("family")
+    present = [family for family in FONT_CANDIDATES if family in families]
+    for family in present + [default_family]:
+        if can_draw(family):
+            return family
+    return present[0] if present else default_family
+
+
 def update_display():
     """Redraw the small status line and the big number."""
     if state.error:
@@ -283,15 +390,14 @@ def update_display():
 
 
 def add_button(text, command, row, column, columnspan):
-    button = tk.Button(
-        state.root,
-        text=text,
-        font=FONT,
-        bg=BACKGROUND,
-        fg=FOREGROUND,
-        command=command,
+    button = colour_widget(
+        tk.Button(state.root, text=text, font=state.font, command=command, padx=8, pady=8),
+        background="button",
+        foreground="button_text",
+        activebackground="button_active",
+        activeforeground="button_text",
     )
-    button.grid(row=row, column=column, columnspan=columnspan, sticky="nsew", padx=3, pady=3)
+    button.grid(row=row, column=column, columnspan=columnspan, sticky="nsew", padx=4, pady=4)
     return button
 
 
@@ -512,6 +618,24 @@ def press_constant(name):
     update_display()
 
 
+def switch_theme(name):
+    """Put one of the themes on, from the menu or from the button."""
+    if name not in THEMES:
+        return
+    state.theme = name
+    state.theme_var.set(name)
+    apply_theme()
+    state.error = None
+    state.status = "Theme: " + name
+    update_display()
+
+
+def press_theme():
+    """Step to the next theme in the list."""
+    names = list(THEME_NAMES)
+    switch_theme(names[(names.index(state.theme) + 1) % len(names)])
+
+
 def press_history():
     """Show the history in its own window, or bring that window up to date.
 
@@ -523,20 +647,35 @@ def press_history():
         for child in window.winfo_children():
             child.destroy()
     else:
-        window = tk.Toplevel(state.root)
+        window = colour_widget(tk.Toplevel(state.root), background="window")
         window.title("The Calculation History!")
-        window.configure(bg=BACKGROUND)
         state.history_window = window
 
     if not state.history:
-        tk.Label(window, text="Nothing has been worked out yet.", padx=20, pady=20,
-                 font=FONT, bg=BACKGROUND, fg=FOREGROUND).pack()
+        colour_widget(
+            tk.Label(window, text="Nothing has been worked out yet.", padx=24, pady=20,
+                     font=state.font),
+            background="window",
+            foreground="status",
+        ).pack()
     for number, entry in enumerate(state.history, start=1):
-        tk.Button(window, text=f"{number}. {entry.text}", padx=20, pady=10, font=SMALL_FONT,
-                  bg=BACKGROUND, fg=FOREGROUND, anchor="w",
-                  command=lambda entry=entry: reuse_answer(entry)).pack(fill="x", padx=10, pady=2)
-    tk.Button(window, text="Clear", padx=20, pady=10, font=SMALL_FONT,
-              bg=BACKGROUND, fg=FOREGROUND, command=clear_history).pack(pady=(10, 20))
+        colour_widget(
+            tk.Button(window, text=f"{number}. {entry.text}", padx=20, pady=10,
+                      font=state.small_font, anchor="w",
+                      command=lambda entry=entry: reuse_answer(entry)),
+            background="button",
+            foreground="button_text",
+            activebackground="button_active",
+            activeforeground="button_text",
+        ).pack(fill="x", padx=12, pady=3)
+    colour_widget(
+        tk.Button(window, text="Clear", padx=20, pady=10, font=state.small_font,
+                  command=clear_history),
+        background="button",
+        foreground="button_text",
+        activebackground="button_active",
+        activeforeground="button_text",
+    ).pack(pady=(10, 20))
     window.lift()
 
 
@@ -598,42 +737,30 @@ def show_result_window(answer):
         state.result_window.lift()
         return
 
-    window = tk.Toplevel(state.root)
+    window = colour_widget(tk.Toplevel(state.root), background="window")
     window.title("The Calculation Result!")
-    window.configure(bg=BACKGROUND)
-    state.result_label = tk.Label(
-        window,
-        text="Your result is: " + answer,
-        padx=20,
-        pady=20,
-        font=FONT,
-        bg=BACKGROUND,
-        fg=FOREGROUND,
+    state.result_label = colour_widget(
+        tk.Label(window, text="Your result is: " + answer, padx=24, pady=20, font=state.font),
+        background="window",
+        foreground="text",
     )
     state.result_label.pack()
     state.result_window = window
 
 
 def open_about_window():
-    window = tk.Toplevel(state.root)
+    window = colour_widget(tk.Toplevel(state.root), background="window")
     window.title("About This App")
-    window.configure(bg=BACKGROUND)
-    tk.Label(
-        window,
-        text="VER 10.0! Made by Sasha!",
-        padx=20,
-        pady=20,
-        font=FONT,
-        bg=BACKGROUND,
-        fg=FOREGROUND,
+    colour_widget(
+        tk.Label(window, text="VER 11.0! Made by Sasha!", padx=24, pady=20, font=state.font),
+        background="window",
+        foreground="text",
     ).pack()
-    tk.Label(
-        window,
-        text="Version 10: the calculation history, from issue #8.",
-        padx=20,
-        font=SMALL_FONT,
-        bg=BACKGROUND,
-        fg=FOREGROUND,
+    colour_widget(
+        tk.Label(window, text="Version 11: five colour themes, from issue #9.",
+                 padx=24, font=state.small_font),
+        background="window",
+        foreground="status",
     ).pack(pady=(0, 20))
 
 
@@ -687,19 +814,47 @@ def on_key(event):
 def build_window():
     """Create the calculator window and remember its widgets on state."""
     root = tk.Tk()
-    root.title("My Fancy-Shmancy Calculator V10")
-    root.configure(bg=BACKGROUND)
+    root.title("My Fancy-Shmancy Calculator V11")
+
+    # A font this machine really has, in three sizes, and a fresh register of
+    # everything that is painted from the theme.
+    state.font_family = choose_font_family()
+    state.font = (state.font_family, LABEL_SIZE)
+    state.small_font = (state.font_family, SMALL_SIZE)
+    state.number_font = (state.font_family, NUMBER_SIZE)
+    state.themed = []
     state.root = root
+    colour_widget(root, background="window")
 
-    state.status_label = tk.Label(
-        root, text="", font=SMALL_FONT, bg=BACKGROUND, fg=FOREGROUND, anchor="e", padx=20
-    )
-    state.status_label.grid(row=0, column=0, columnspan=4, sticky="ew")
+    # The themes in a menu, with About and Quit next to them.
+    state.theme_var = tk.StringVar(value=state.theme)
+    menubar = tk.Menu(root)
+    theme_menu = tk.Menu(menubar, tearoff=False)
+    for name in THEME_NAMES:
+        theme_menu.add_radiobutton(label=name, variable=state.theme_var, value=name,
+                                   command=lambda name=name: switch_theme(name))
+    help_menu = tk.Menu(menubar, tearoff=False)
+    help_menu.add_command(label="About", command=open_about_window)
+    help_menu.add_command(label="Quit", command=root.destroy)
+    menubar.add_cascade(label="Theme", menu=theme_menu)
+    menubar.add_cascade(label="Help", menu=help_menu)
+    for menu in (menubar, theme_menu, help_menu):
+        colour_widget(menu, background="window", foreground="text")
+    root.configure(menu=menubar)
 
-    state.display_label = tk.Label(
-        root, text="0", font=FONT, bg=BACKGROUND, fg=FOREGROUND, anchor="e", padx=20, pady=10
+    state.status_label = colour_widget(
+        tk.Label(root, text="", font=state.small_font, anchor="e", padx=24),
+        background="window",
+        foreground="status",
     )
-    state.display_label.grid(row=1, column=0, columnspan=4, sticky="ew")
+    state.status_label.grid(row=0, column=0, columnspan=4, sticky="ew", pady=(10, 0))
+
+    state.display_label = colour_widget(
+        tk.Label(root, text="0", font=state.number_font, anchor="e", padx=24, pady=16),
+        background="display",
+        foreground="text",
+    )
+    state.display_label.grid(row=1, column=0, columnspan=4, sticky="ew", padx=12, pady=(4, 10))
 
     for label, row, column, columnspan in KEYPAD:
         if label in OPERATORS:
@@ -724,11 +879,15 @@ def build_window():
             command = press_reset
         elif label == "About":
             command = open_about_window
+        elif label == "Theme":
+            command = press_theme
         else:
             command = lambda digit=label: press_digit(digit)
         button = add_button(label, command, row, column, columnspan)
         if label == "DEG":
             state.angle_button = button       # its label follows the switch
+        if label == "Theme":
+            state.theme_button = button
 
     for column in range(4):
         root.columnconfigure(column, weight=1)
@@ -737,7 +896,7 @@ def build_window():
 
     for row in range(2, 11):
         root.rowconfigure(row, weight=1)
-    root.minsize(360, 670)
+    root.minsize(430, 700)
     return root
 
 
