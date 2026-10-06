@@ -1,6 +1,12 @@
-"""A small Tkinter calculator - version 9.
+"""A small Tkinter calculator - version 10.
 
-Version 9 adds the keyboard and the backspace key asked for in issue #7:
+Version 10 adds the history asked for in issue #8: every finished calculation
+is remembered, newest first, and the History button opens them in their own
+window. Picking an entry puts its answer back on show, ready to carry on from,
+and Clear empties the list. The list is kept in memory only, so it lasts as
+long as the window is open, and the oldest entries drop off at HISTORY_LIMIT.
+
+Version 9 added the keyboard and the backspace key asked for in issue #7:
 
 * the keyboard types what the buttons do: the digits, `.`, `+ - * / ^ %`, `=` or
   Enter for the answer, Escape for Reset, and Backspace to take a character off
@@ -34,6 +40,7 @@ Run it with:
 
 import math
 import sys
+from collections import namedtuple
 from types import SimpleNamespace
 
 try:
@@ -67,6 +74,12 @@ FUNCTIONS = {
 # the two famous numbers, and the label each button shows
 CONSTANTS = {"π": math.pi, "e": math.e}
 
+# How many finished calculations the history keeps; the oldest drop off.
+HISTORY_LIMIT = 20
+
+# One finished calculation: what it says on the status line, and the answer.
+HistoryEntry = namedtuple("HistoryEntry", "text value")
+
 # Anything this close to zero counts as zero: Python's cos 90° is 6.1e-17, and
 # its tan 90° is 1.6e16, which is not an answer at all.
 SMALL = 1e-12
@@ -80,7 +93,7 @@ KEYPAD = (
     ("√", 6, 0, 1), ("^", 6, 1, 1), ("ln", 6, 2, 1), ("eˣ", 6, 3, 1),
     ("log", 7, 0, 1), ("%", 7, 1, 1), ("sin", 7, 2, 1), ("cos", 7, 3, 1),
     ("tg", 8, 0, 1), ("ctg", 8, 1, 1), ("π", 8, 2, 1), ("e", 8, 3, 1),
-    ("⌫", 9, 0, 2), ("DEG", 9, 2, 2),
+    ("⌫", 9, 0, 1), ("DEG", 9, 1, 1), ("History", 9, 2, 2),
     ("Reset", 10, 0, 1), ("=", 10, 1, 2), ("About", 10, 3, 1),
 )
 
@@ -99,6 +112,8 @@ state = SimpleNamespace(
     error=None,          # a message to show instead of the status line
     angle_mode="deg",    # what sin, cos, tg and ctg measure angles in
     keys=None,           # what each keyboard key does, filled in when the window is built
+    history=[],          # finished calculations, newest first
+    history_window=None, # the window that shows them
 )
 
 
@@ -347,8 +362,15 @@ def refuse(message):
     state.error = message
 
 
+def remember(text, value):
+    """Keep a finished calculation for the history, newest first."""
+    state.history.insert(0, HistoryEntry(text, value))
+    del state.history[HISTORY_LIMIT:]
+
+
 def finish_calculation():
     """Work out  first <operator> entry.  Returns True when it worked."""
+    expression = f"{format_number(state.first)} {state.operator} {state.entry}"
     try:
         value = calculate(state.first, state.operator, to_number(state.entry))
         text = format_number(value)
@@ -359,7 +381,8 @@ def finish_calculation():
     state.first = value
     state.operator = None
     state.entry = ""
-    state.status = text
+    state.status = f"{expression} = {text}"
+    remember(state.status, value)
     return True
 
 
@@ -403,6 +426,7 @@ def finish_with(value, written):
     state.operator = None
     state.entry = ""
     state.status = f"{left} {operator} {written} = {format_number(combined)}"
+    remember(state.status, combined)
     return True
 
 
@@ -439,6 +463,7 @@ def press_function(function):
         state.first = answer
         state.entry = ""
         state.status = f"{written} = {format_number(answer)}"
+        remember(state.status, answer)
         update_display()
         return
 
@@ -487,6 +512,50 @@ def press_constant(name):
     update_display()
 
 
+def press_history():
+    """Show the history in its own window, or bring that window up to date.
+
+    The list is rebuilt every time rather than kept in step, so there is nothing
+    to go stale when a calculation is added or the list is cleared.
+    """
+    window = state.history_window
+    if window is not None and window.winfo_exists():
+        for child in window.winfo_children():
+            child.destroy()
+    else:
+        window = tk.Toplevel(state.root)
+        window.title("The Calculation History!")
+        window.configure(bg=BACKGROUND)
+        state.history_window = window
+
+    if not state.history:
+        tk.Label(window, text="Nothing has been worked out yet.", padx=20, pady=20,
+                 font=FONT, bg=BACKGROUND, fg=FOREGROUND).pack()
+    for number, entry in enumerate(state.history, start=1):
+        tk.Button(window, text=f"{number}. {entry.text}", padx=20, pady=10, font=SMALL_FONT,
+                  bg=BACKGROUND, fg=FOREGROUND, anchor="w",
+                  command=lambda entry=entry: reuse_answer(entry)).pack(fill="x", padx=10, pady=2)
+    tk.Button(window, text="Clear", padx=20, pady=10, font=SMALL_FONT,
+              bg=BACKGROUND, fg=FOREGROUND, command=clear_history).pack(pady=(10, 20))
+    window.lift()
+
+
+def reuse_answer(entry):
+    """Put an old answer back on show, ready to carry on from."""
+    state.error = None
+    state.first = entry.value
+    state.operator = None
+    state.entry = ""
+    state.status = entry.text
+    update_display()
+
+
+def clear_history():
+    """Forget everything that has been worked out."""
+    state.history.clear()
+    press_history()
+
+
 def press_angle_mode():
     """Switch sin, cos, tg and ctg between degrees and radians.
 
@@ -507,11 +576,8 @@ def press_equals():
         update_display()
         return
 
-    expression = f"{format_number(state.first)} {state.operator} {state.entry}"
     if finish_calculation():
-        answer = state.status
-        state.status = f"{expression} = {answer}"
-        show_result_window(answer)
+        show_result_window(format_number(state.first))
     update_display()
 
 
@@ -554,7 +620,7 @@ def open_about_window():
     window.configure(bg=BACKGROUND)
     tk.Label(
         window,
-        text="VER 9.0! Made by Sasha!",
+        text="VER 10.0! Made by Sasha!",
         padx=20,
         pady=20,
         font=FONT,
@@ -563,7 +629,7 @@ def open_about_window():
     ).pack()
     tk.Label(
         window,
-        text="Version 9: the keyboard and ⌫, from issue #7.",
+        text="Version 10: the calculation history, from issue #8.",
         padx=20,
         font=SMALL_FONT,
         bg=BACKGROUND,
@@ -621,7 +687,7 @@ def on_key(event):
 def build_window():
     """Create the calculator window and remember its widgets on state."""
     root = tk.Tk()
-    root.title("My Fancy-Shmancy Calculator V9")
+    root.title("My Fancy-Shmancy Calculator V10")
     root.configure(bg=BACKGROUND)
     state.root = root
 
@@ -650,6 +716,8 @@ def build_window():
             command = lambda name=label: press_constant(name)
         elif label == "⌫":
             command = press_backspace
+        elif label == "History":
+            command = press_history
         elif label == "DEG":
             command = press_angle_mode
         elif label == "Reset":
