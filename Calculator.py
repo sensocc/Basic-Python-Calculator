@@ -1,14 +1,12 @@
-"""A small Tkinter calculator - version 5.
+"""A small Tkinter calculator - version 6.
 
-Version 5 adds the two buttons asked for in issue #3, so numbers no longer have
-to be whole and positive:
+Version 6 adds the two one-number buttons asked for in issue #4:
 
-* `.` - a decimal point, so `12.5`, `0.5` and a careless `12.` can be typed
-* `±` - flips the sign of the number on show, so `5 ±` is `-5`
+* `log` - the common logarithm, base 10: `100 log` is `2`, `0.1 log` is `-1`
+* `%` - percent, which is the number divided by 100: `50 %` is `0.5`
 
-They work the way the rest of the keypad does: the digits and the decimal point
-build the number being typed, and the sign can be flipped at any point. An
-answer that is on show can be flipped too, so `3 - 5 =` then `±` shows `2`.
+They are used the way `eˣ` and `ln` are - type the number, press the button -
+and they work on an answer that is on show as well.
 
 Run it with:
 
@@ -33,7 +31,7 @@ SMALL_FONT = ("Arial", 12)
 OPERATORS = ("/", "*", "-", "+", "√", "^")
 
 # label -> the one-number function it applies
-FUNCTIONS = {"eˣ": "exp", "ln": "ln"}
+FUNCTIONS = {"eˣ": "exp", "ln": "ln", "log": "log10", "%": "percent"}
 
 # label, grid row, grid column, columnspan
 KEYPAD = (
@@ -42,7 +40,8 @@ KEYPAD = (
     ("1", 4, 0, 1), ("2", 4, 1, 1), ("3", 4, 2, 1), ("-", 4, 3, 1),
     ("0", 5, 0, 1), (".", 5, 1, 1), ("±", 5, 2, 1), ("+", 5, 3, 1),
     ("√", 6, 0, 1), ("^", 6, 1, 1), ("ln", 6, 2, 1), ("eˣ", 6, 3, 1),
-    ("Reset", 7, 0, 1), ("=", 7, 1, 2), ("About", 7, 3, 1),
+    ("log", 7, 0, 2), ("%", 7, 2, 2),
+    ("Reset", 8, 0, 1), ("=", 8, 1, 2), ("About", 8, 3, 1),
 )
 
 # The whole calculator state lives here, so no function needs a `global` line.
@@ -125,21 +124,31 @@ def calculate(left, operator, right):
     return result
 
 
+def logarithm(function, value):
+    """ln and log₁₀ share the rule that the number has to be above zero."""
+    if value <= 0:
+        raise ValueError("I can only take the logarithm of a number above zero.")
+    if function == "ln":
+        return math.log(value)
+    return math.log10(value)
+
+
 def apply_function(function, value):
     """Apply a one-number function. Raises ValueError with a readable message.
 
     `exp` is the natural exponent, e to the power of the number; `ln` is the
-    natural logarithm, the power you raise e to, to get the number.
+    natural logarithm, the power you raise e to; `log10` is the common
+    logarithm, base 10; and `percent` is simply the number divided by 100.
     """
     if function == "exp":
         try:
             result = math.exp(value)
         except OverflowError:
             raise ValueError("That exponent is too big to work out.") from None
-    elif function == "ln":
-        if value <= 0:
-            raise ValueError("I can only take the logarithm of a number above zero.")
-        result = math.log(value)
+    elif function in ("ln", "log10"):
+        result = logarithm(function, value)
+    elif function == "percent":
+        result = value / 100
     else:
         raise ValueError(f"I do not know the function {function!r}.")
 
@@ -152,7 +161,13 @@ def write_function(function, text):
     """How a one-number function reads on the status line."""
     if function == "exp":
         return "e^" + text
-    return "ln(" + text + ")"
+    if function == "percent":
+        return text + "%"
+    if function == "log10":
+        return "log(" + text + ")"
+    if function == "ln":
+        return "ln(" + text + ")"
+    raise ValueError(f"I do not know how to write the function {function!r}.")
 
 
 # --- drawing -----------------------------------------------------------------
@@ -300,10 +315,10 @@ def press_function(function):
 
     if state.entry:
         value = to_number(state.entry)
-        written = write_function(function, state.entry)
+        shown = state.entry
     elif state.operator is None and state.first is not None:
         value = state.first
-        written = write_function(function, format_number(state.first))
+        shown = format_number(state.first)
     else:
         state.error = "Type a number first."
         update_display()
@@ -315,6 +330,8 @@ def press_function(function):
         refuse(str(error))
         update_display()
         return
+
+    written = write_function(function, shown)
 
     if state.operator is None:
         state.first = answer
@@ -395,7 +412,7 @@ def open_about_window():
     window.configure(bg=BACKGROUND)
     tk.Label(
         window,
-        text="VER 5.0! Made by Sasha!",
+        text="VER 6.0! Made by Sasha!",
         padx=20,
         pady=20,
         font=FONT,
@@ -404,7 +421,7 @@ def open_about_window():
     ).pack()
     tk.Label(
         window,
-        text="Version 5: a decimal point and a ± sign, from issue #3.",
+        text="Version 6: log and percent, from issue #4.",
         padx=20,
         font=SMALL_FONT,
         bg=BACKGROUND,
@@ -417,7 +434,7 @@ def open_about_window():
 def build_window():
     """Create the calculator window and remember its widgets on state."""
     root = tk.Tk()
-    root.title("My Fancy-Shmancy Calculator V5")
+    root.title("My Fancy-Shmancy Calculator V6")
     root.configure(bg=BACKGROUND)
     state.root = root
 
@@ -452,9 +469,9 @@ def build_window():
 
     for column in range(4):
         root.columnconfigure(column, weight=1)
-    for row in range(2, 8):
+    for row in range(2, 9):
         root.rowconfigure(row, weight=1)
-    root.minsize(360, 490)
+    root.minsize(360, 550)
     return root
 
 
