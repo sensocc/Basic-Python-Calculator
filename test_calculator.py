@@ -171,9 +171,9 @@ class KeypadTestCase(unittest.TestCase):
 
 
 class TestLayout(KeypadTestCase):
-    def test_there_are_thirty_buttons(self):
-        self.assertEqual(len(Calculator.KEYPAD), 30)
-        self.assertEqual(len(self.buttons), 30)
+    def test_there_are_thirty_two_buttons(self):
+        self.assertEqual(len(Calculator.KEYPAD), 32)
+        self.assertEqual(len(self.buttons), 32)
 
     def test_every_keypad_entry_has_a_button(self):
         for entry in Calculator.KEYPAD:
@@ -189,8 +189,8 @@ class TestLayout(KeypadTestCase):
                                    ("0", 5, 0), (".", 5, 1), ("±", 5, 2), ("+", 5, 3),
                                    ("√", 6, 0), ("ln", 6, 2), ("eˣ", 6, 3),
                                    ("log", 7, 0), ("sin", 7, 2), ("cos", 7, 3),
-                                   ("tg", 8, 0), ("ctg", 8, 1), ("DEG", 8, 2),
-                                   ("Reset", 9, 0), ("=", 9, 1), ("About", 9, 3)):
+                                   ("tg", 8, 0), ("ctg", 8, 1), ("π", 8, 2), ("e", 8, 3),
+                                   ("DEG", 9, 0), ("=", 9, 2), ("About", 9, 3)):
             options = self.buttons[label].grid_options
             self.assertEqual((options["row"], options["column"]), (row, column),
                              "button " + label)
@@ -201,11 +201,11 @@ class TestLayout(KeypadTestCase):
         self.assertEqual(columns, [0, 1, 2, 3])
         self.assertEqual(rows, [2, 3, 4, 5, 6, 7, 8, 9])
 
-    def test_equals_spans_two_columns(self):
-        self.assertEqual(self.buttons["="].grid_options["columnspan"], 2)
-
-    def test_the_angle_switch_spans_two_columns(self):
-        self.assertEqual(self.buttons["DEG"].grid_options["columnspan"], 2)
+    def test_the_bottom_row_holds_the_whole_window_controls(self):
+        for label, column in (("DEG", 0), ("Reset", 1), ("=", 2), ("About", 3)):
+            with self.subTest(button=label):
+                options = self.buttons[label].grid_options
+                self.assertEqual((options["row"], options["column"]), (9, column))
 
     def test_the_status_line_sits_above_the_number(self):
         status = Calculator.state.status_label.grid_options
@@ -215,7 +215,7 @@ class TestLayout(KeypadTestCase):
         self.assertLess(status["row"], display["row"])
 
     def test_the_window_has_a_title(self):
-        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V7")
+        self.assertEqual(self.root.title_text, "My Fancy-Shmancy Calculator V8")
 
 
 class TestTheMaths(unittest.TestCase):
@@ -422,8 +422,8 @@ class TestButtons(KeypadTestCase):
         self.assertEqual(about.title_text, "About This App")
         labels = [widget.cget("text") for widget in FakeLabel.instances
                   if widget.master is about]
-        self.assertEqual(labels, ["VER 7.0! Made by Sasha!",
-                                 "Version 7: sin, cos, tg and ctg, with a DEG/RAD switch."])
+        self.assertEqual(labels, ["VER 8.0! Made by Sasha!",
+                                 "Version 8: the constants π and e, from issue #6."])
 
 
 class TestTypingDecimalsAndSigns(KeypadTestCase):
@@ -500,6 +500,60 @@ class TestTypingDecimalsAndSigns(KeypadTestCase):
     def test_the_sign_button_after_an_operator_with_no_number(self):
         self.press("2", "+", "±")
         self.assertEqual(self.status(), "Type a number first.")
+
+
+class TestTheConstantButtons(KeypadTestCase):
+    """π and e, from issue #6."""
+
+    def test_pi(self):
+        self.press("π")
+        self.assertEqual(self.display(), "3.14159265359")
+        self.assertEqual(self.status(), "π")
+
+    def test_e(self):
+        self.press("e")
+        self.assertEqual(self.display(), "2.71828182846")
+        self.assertEqual(self.status(), "e")
+
+    def test_the_issue_6_example(self):
+        self.press("π", "*", "2", "=")
+        self.assertEqual(self.display(), "6.28318530718")
+
+    def test_a_constant_in_a_calculation(self):
+        self.press("e", "+", "1", "=")
+        self.assertEqual(self.display(), "3.71828182846")
+
+    def test_a_digit_after_a_constant_starts_a_new_number(self):
+        self.press("π", "7")
+        self.assertEqual(self.display(), "7")
+        self.assertEqual(self.status(), "")
+
+    def test_a_decimal_point_after_a_constant_starts_a_new_number(self):
+        self.press("π", ".")
+        self.assertEqual(self.display(), "0.")
+
+    def test_a_constant_finishes_a_waiting_calculation(self):
+        self.press("2", "+", "π")
+        self.assertEqual(self.display(), "5.14159265359")
+        self.assertEqual(self.status(), "2 + π = 5.14159265359")
+
+    def test_a_constant_takes_the_place_of_a_half_typed_number(self):
+        self.press("1", "2", "+", "5", "π")
+        self.assertEqual(self.display(), "15.1415926536")
+        self.assertEqual(self.status(), "12 + π = 15.1415926536")
+
+    def test_the_sign_button_flips_a_constant(self):
+        self.press("π", "±")
+        self.assertEqual(self.display(), "-3.14159265359")
+
+    def test_a_constant_can_be_fed_to_a_function(self):
+        self.press("e", "ln")
+        self.assertEqual(self.display(), "1")
+        self.assertEqual(self.status(), "ln(2.71828182846) = 1")
+
+    def test_the_operators_can_carry_on_from_a_constant(self):
+        self.press("e", "+", "e", "=")
+        self.assertEqual(self.display(), "5.43656365692")
 
 
 class TestTheAngleButtons(KeypadTestCase):

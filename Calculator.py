@@ -1,6 +1,15 @@
-"""A small Tkinter calculator - version 7.
+"""A small Tkinter calculator - version 8.
 
-Version 7 adds the trigonometry asked for in issue #5:
+Version 8 adds the two constants asked for in issue #6:
+
+* `π` - 3.141592653589793
+* `e` - 2.718281828459045
+
+They behave like an answer rather than a typed number: they take the place of
+whatever is on show, they finish a calculation that is waiting (`2 + π` is
+5.14159265359), and typing a digit afterwards starts a fresh number.
+
+Version 7 added the trigonometry asked for in issue #5:
 
 * `sin`, `cos`, `tg` and `ctg` - type an angle, press the button
 * a `DEG` / `RAD` switch, because an angle means nothing without its unit
@@ -45,6 +54,9 @@ FUNCTIONS = {
     "ctg": "ctg",
 }
 
+# the two famous numbers, and the label each button shows
+CONSTANTS = {"π": math.pi, "e": math.e}
+
 # Anything this close to zero counts as zero: Python's cos 90° is 6.1e-17, and
 # its tan 90° is 1.6e16, which is not an answer at all.
 SMALL = 1e-12
@@ -57,8 +69,8 @@ KEYPAD = (
     ("0", 5, 0, 1), (".", 5, 1, 1), ("±", 5, 2, 1), ("+", 5, 3, 1),
     ("√", 6, 0, 1), ("^", 6, 1, 1), ("ln", 6, 2, 1), ("eˣ", 6, 3, 1),
     ("log", 7, 0, 1), ("%", 7, 1, 1), ("sin", 7, 2, 1), ("cos", 7, 3, 1),
-    ("tg", 8, 0, 1), ("ctg", 8, 1, 1), ("DEG", 8, 2, 2),
-    ("Reset", 9, 0, 1), ("=", 9, 1, 2), ("About", 9, 3, 1),
+    ("tg", 8, 0, 1), ("ctg", 8, 1, 1), ("π", 8, 2, 1), ("e", 8, 3, 1),
+    ("DEG", 9, 0, 1), ("Reset", 9, 1, 1), ("=", 9, 2, 1), ("About", 9, 3, 1),
 )
 
 # The whole calculator state lives here, so no function needs a `global` line.
@@ -360,6 +372,28 @@ def press_operator(operator):
     update_display()
 
 
+def finish_with(value, written):
+    """Finish the waiting calculation, with `value` as its last number.
+
+    `written` is how that last number reads on the status line: a function's
+    label such as `ln(3)`, or a constant's name such as `π`. Returns True when
+    the calculation worked.
+    """
+    left = format_number(state.first)
+    operator = state.operator
+    try:
+        combined = calculate(state.first, operator, value)
+    except ValueError as error:
+        refuse(str(error))
+        return False
+
+    state.first = combined
+    state.operator = None
+    state.entry = ""
+    state.status = f"{left} {operator} {written} = {format_number(combined)}"
+    return True
+
+
 def press_function(function):
     """Apply a one-number function to the number on show.
 
@@ -397,19 +431,28 @@ def press_function(function):
         return
 
     # Something like  2 + 3  is waiting: finish it with the answer as its last number.
-    left = format_number(state.first)
-    operator = state.operator
-    try:
-        combined = calculate(state.first, operator, answer)
-    except ValueError as error:
-        refuse(str(error))
+    finish_with(answer, written)
+    update_display()
+
+
+def press_constant(name):
+    """Put π or e on show.
+
+    A constant behaves like an answer rather than a typed number: it takes the
+    place of whatever is on show, it finishes a calculation that is waiting, and
+    typing a digit afterwards starts a fresh number.
+    """
+    state.error = None
+    value = CONSTANTS[name]
+
+    if state.operator is None or state.first is None:
+        state.first = value
+        state.entry = ""
+        state.status = name          # the digits are already in the display
         update_display()
         return
 
-    state.first = combined
-    state.operator = None
-    state.entry = ""
-    state.status = f"{left} {operator} {written} = {format_number(combined)}"
+    finish_with(value, name)
     update_display()
 
 
@@ -480,7 +523,7 @@ def open_about_window():
     window.configure(bg=BACKGROUND)
     tk.Label(
         window,
-        text="VER 7.0! Made by Sasha!",
+        text="VER 8.0! Made by Sasha!",
         padx=20,
         pady=20,
         font=FONT,
@@ -489,7 +532,7 @@ def open_about_window():
     ).pack()
     tk.Label(
         window,
-        text="Version 7: sin, cos, tg and ctg, with a DEG/RAD switch.",
+        text="Version 8: the constants π and e, from issue #6.",
         padx=20,
         font=SMALL_FONT,
         bg=BACKGROUND,
@@ -502,7 +545,7 @@ def open_about_window():
 def build_window():
     """Create the calculator window and remember its widgets on state."""
     root = tk.Tk()
-    root.title("My Fancy-Shmancy Calculator V7")
+    root.title("My Fancy-Shmancy Calculator V8")
     root.configure(bg=BACKGROUND)
     state.root = root
 
@@ -527,6 +570,8 @@ def build_window():
             command = press_decimal_point
         elif label == "±":
             command = press_sign
+        elif label in CONSTANTS:
+            command = lambda name=label: press_constant(name)
         elif label == "DEG":
             command = press_angle_mode
         elif label == "Reset":

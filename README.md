@@ -1,4 +1,4 @@
-# Basic Python Calculator — version 7
+# Basic Python Calculator — version 8
 
 [![Tests](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml/badge.svg)](https://github.com/sensocc/Basic-Python-Calculator/actions/workflows/tests.yml)
 
@@ -6,14 +6,14 @@ A small desktop calculator written in Python with [Tkinter](https://docs.python.
 Type the first number, pick an operator, type the second number, press `=` — the answer appears in the main
 window and in a small popup. The numbers can be decimals, and the `±` button makes them negative. There are
 one-number buttons for `eˣ`, `ln`, `log`, `%`, and for the trigonometry `sin`, `cos`, `tg` and `ctg` — those
-four with a `DEG` / `RAD` switch. Made by Sasha.
+four with a `DEG` / `RAD` switch — plus the two constants `π` and `e`. Made by Sasha.
 
-**This is version 7**, the newest one, tagged `v7.0`: the trigonometry that [issue #5][issue] asked for, on
-top of the tests and the workflow that keep the calculator working.
+**This is version 8**, the newest one, tagged `v8.0`: the `π` and `e` buttons that [issue #6][issue] asked
+for, on top of the tests and the workflow that keep the calculator working.
 
-[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/5
+[issue]: https://github.com/sensocc/Basic-Python-Calculator/issues/6
 
-## The seven versions
+## The eight versions
 
 This repository keeps every version of the calculator as a version of **one file** — `Calculator.py`, each
 with its own `README.md` — instead of several files sitting side by side:
@@ -26,7 +26,8 @@ with its own `README.md` — instead of several files sitting side by side:
 | `v4.0` | Adds `eˣ` and `ln`, the two one-number buttons from issue #1. | `git checkout v4.0` |
 | `v5.0` | Type decimals and negatives: a `.` and a `±` beside the digits. | `git checkout v5.0` |
 | `v6.0` | Adds `log` (base 10) and `%` (divide by 100). | `git checkout v6.0` |
-| `v7.0` | **This version.** Adds `sin`, `cos`, `tg` and `ctg`, and the `DEG` / `RAD` switch they obey. | `git checkout v7.0` |
+| `v7.0` | Adds `sin`, `cos`, `tg` and `ctg`, and the `DEG` / `RAD` switch they obey. | `git checkout v7.0` |
+| `v8.0` | **This version.** Adds the constants `π` and `e`. | `git checkout v8.0` |
 
 Every tag is also a GitHub Release, so any version can be downloaded as a zip without using git.
 
@@ -84,11 +85,11 @@ This calculator needs Python's tkinter toolkit, and Tk is not installed.
   │ √  │ ^  │ ln │ eˣ │
   ├────┼────┼────┼────┤
   │log │ %  │sin │cos │
-  ├────┼────┼────┴────┤
-  │ tg │ctg │   DEG   │
-  ├────┼────┴────┬────┤
-  │Reset│   =    │About│
-  └─────┴────────┴─────┘
+  ├────┼────┼────┼────┤
+  │ tg │ctg │ π  │ e  │
+  ├────┼────┼────┼────┤
+  │DEG │Reset│ =  │About│
+  └────┴────┴────┴────┘
 ```
 
 1. Press the digits of the first number. Decimals and negatives are typed the same way: `.` starts `0.` and
@@ -106,7 +107,13 @@ type the number, then press the button (`√` is not one of them — it takes th
 number: `8 √ 3 =` is `2`). Pressing one while an answer is already on show works on that answer, and pressing
 one while a calculation is waiting finishes it — `2 + 3 ln` is `2 + ln(3)`.
 
-`±` is the exception to "number first": it acts on whatever is on show, so `3 - 5 =` then `±` shows `2`.
+Two kinds of button are the exceptions to "number first":
+
+* `±` acts on whatever is on show, so `3 - 5 =` then `±` shows `2`.
+* `π` and `e` **are** numbers, not operations: they take the place of whatever is on show. `π + 1 =` is
+  `4.14159265359`, and a digit typed afterwards starts a fresh number rather than adding to the digits of π.
+  If a calculation is waiting, the constant is its last number: `2 + π` shows `2 + π = 5.14159265359` there
+  and then.
 
 ### Angles: the DEG / RAD switch
 
@@ -134,10 +141,13 @@ sum you are working on.
 | `%` | percent: the number divided by 100 | `50 %` → `0.5`, `200 %` → `2` |
 | `sin` `cos` `tg` `ctg` | sine, cosine, tangent and cotangent of an angle, in the unit the switch is set to | `30 sin` → `0.5`, `45 tg` → `1` |
 | `DEG` / `RAD` | the unit the four angle buttons use; it starts on `DEG` and renames itself when pressed | `30 sin` → `0.5`, then press it: `30 sin` → `-0.988031624093` |
+| `π` | 3.141592653589793, put straight on show | `π * 2 =` → `6.28318530718` |
+| `e` | 2.718281828459045, put straight on show | `e + 1 =` → `3.71828182846` |
 | `.` | decimal point — one per number | `1 . 5` → `1.5`, `.` on its own → `0.` |
 | `±` | flips the sign of the number on show | `5 ±` → `-5`, `3 - 5 = ±` → `2` |
 
-`eˣ` and `ln` undo each other, so `5 eˣ ln` gives `5` back.
+`eˣ` and `ln` undo each other, so `5 eˣ ln` gives `5` back — and `e ln` is `1`, since the natural logarithm of
+`e` is what it was built on.
 
 ### Messages instead of crashes
 
@@ -160,28 +170,27 @@ Bad input gets a sentence in the status line rather than a red traceback in the 
 comes out infinite or too large for a float; those are hard to reach by clicking, so they are covered by
 tests rather than by a button sequence.
 
-## What changed in version 7
+## What changed in version 8
 
-* **Four angle buttons.** `sin`, `cos`, `tg` and `ctg`, following the one-number pattern from versions 4 and
-  6: a row in `FUNCTIONS`, a branch in `apply_function()`, and a label from `write_function()`.
-* **A unit switch.** `DEG` / `RAD` on the keypad, starting on `DEG`. It renames itself as you press it, and it
-  is a setting rather than part of the sum, so `Reset` leaves it where it is.
-* **The two traps, handled.** Python's `tan` of 90° is `1.6e16`, which is not an answer, so `tg` refuses the
-  angles where the tangent does not exist and `ctg` refuses the ones where the cotangent does not. Python
-  also returns `6.1e-17` for `cos 90°`, so any trig result within `1e-12` of zero is shown as `0` — the button
-  would look broken otherwise.
-* **The answer says which unit made it.** `sin(30°) = 0.5` in degrees and `sin(30 rad) = -0.988031624093` in
-  radians, so an answer copied out of the window cannot be misread.
-* **In the code:** a `trigonometry()` helper beside `logarithm()`, an angle mode that `apply_function()` and
-  `write_function()` both take, a `press_angle_mode()` handler, and `add_button()` now returns the button it
-  made so the switch can rename itself.
-* **In the layout:** the function block is two rows now (`log % sin cos`, then `tg ctg DEG`), and `log` and
-  `%` became single-width to make room, so the keypad is eight rows of buttons.
-* **In the tests:** 17 new ones, including the issue's example (`30 sin` in both units), the snap-to-zero, the
-  two refusals, and the switch keeping the number you are halfway through typing.
+* **Two constants.** `π` and `e` put 3.141592653589793 and 2.718281828459045 straight on show, so you stop
+  typing 16 digits by hand. They live in a small `CONSTANTS` table, one entry each.
+* **They behave like an answer, not like a typed number.** A constant replaces whatever is on show, and a
+  digit typed afterwards starts a fresh number instead of being added to the end of π. That is the same rule
+  the one-number buttons already obey, so it needed no new state at all.
+* **A waiting calculation is finished with the constant** as its last number: `2 + π` reads
+  `2 + π = 5.14159265359`. That path is now shared: `press_function()` and `press_constant()` both end with
+  one `finish_with(value, written)` helper, which took a duplicate block out of `press_function()`.
+* **In the layout:** the constants join the last function row (`tg ctg π e`), and the bottom row became the
+  whole-window controls — `DEG Reset = About`. That cost `=` its two-column width, and bought back the row
+  that two more buttons would otherwise have needed, so the window is the same height as version 7.
+* **In the tests:** 10 new ones — both constants, the issue's example (`π * 2 =` → `6.28318530718`), a digit
+  and a decimal point starting fresh afterwards, a constant replacing a half-typed number, `2 + π`, `e ln`
+  being `1`, and `±` flipping π.
 
 ### Earlier versions
 
+* **Version 7** — `sin`, `cos`, `tg` and `ctg`, with the `DEG` / `RAD` switch, and the two traps that came
+  with them (no tangent at 90°, and `cos 90°` showing as `0` rather than `6.1e-17`).
 * **Version 6** — `log` (base 10) and `%`, plus the `logarithm()` helper those two buttons share.
 * **Version 5** — a decimal point and a `±` sign, so numbers no longer have to be whole and positive, plus
   `format_number()` learning that `-0.0` is `0`.
@@ -200,7 +209,7 @@ install:
 
 | File | What it checks | Needs |
 |------|----------------|-------|
-| `test_calculator.py` | the maths, every operator, the one-number and angle functions, typing decimals and signs, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
+| `test_calculator.py` | the maths, every operator, the one-number and angle functions, the constants, typing decimals and signs, all the error messages, chaining, the reused result popup, the About window, and the helpful message when Tk is missing. The keypad is driven through a stand-in for `tkinter`, so no window is needed. | nothing but Python |
 | `test_gui_smoke.py` | the same buttons on a **real** Tk window — real widgets, real clicks, no errors inside Tk — and then starts `Calculator.py` to see that its window stays open. | tkinter, the Tcl/Tk libraries and a display; it skips itself when one of those is missing |
 
 Run them:
@@ -219,6 +228,9 @@ Every push and pull request runs them in
 
 ## Known limits
 
+* `π` and `e` cannot be edited digit by digit: pressing one replaces what is on show, and a digit afterwards
+  starts a new number. Type over the digits by typing a fresh number instead.
+* `e` is the constant and `eˣ` is the exponent — neighbours on the keypad, and easy to mix up.
 * Angles are degrees or radians; there are no gradians, and no inverse trigonometry (`asin` and friends) —
   the four buttons go one way only.
 * A trig answer within `1e-12` of zero is shown as `0`, which is why `90 cos` is `0` rather than
@@ -226,7 +238,6 @@ Every push and pull request runs them in
 * `%` is simply the number divided by 100. It does not mean "this much of the number before", so
   `200 + 10 % =` gives `200.1`, not `220`.
 * One decimal point per number, and no scientific notation to type — `1e-5` cannot be entered.
-* `±` flips the whole number; there is no way to negate just part of an expression.
 * `±` needs a number on show: pressing it while an operator is waiting for its second number says
   `Type a number first.`
 * The result popup belongs to `=`; the one-number buttons answer in the big display and the status line.
@@ -235,5 +246,4 @@ Every push and pull request runs them in
 * No history and no keyboard shortcuts yet — those are the next ideas, in
   [#8](https://github.com/sensocc/Basic-Python-Calculator/issues/8) and
   [#7](https://github.com/sensocc/Basic-Python-Calculator/issues/7), along with
-  [#6](https://github.com/sensocc/Basic-Python-Calculator/issues/6) π and e, and
   [#9](https://github.com/sensocc/Basic-Python-Calculator/issues/9) the interface overhaul.
